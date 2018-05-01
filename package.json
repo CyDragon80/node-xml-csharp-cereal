@@ -1,0 +1,36 @@
+{
+  "name": "xml-csharp-cereal",
+  "version": "0.0.0",
+  "description": "A module to provide some C# compatible XML serialization in Nodejs",
+  "main": "xml-csharp-cereal.js",
+  "scripts": {
+    "test": "mocha --reporter spec"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/CyDragon80/node-xml-csharp-cereal.git"
+  },
+  "engines": {
+    "node": ">=6"
+  },
+  "files": [
+    "xml-csharp-cereal.js",
+    "package.json"
+  ],  
+  "keywords": [
+    "C#",
+    "csharp",
+    "xml",
+    "serialization"
+  ],
+  "author": "CyDragon80",
+  "license": "Unlicense",
+  "bugs": {
+    "url": "https://github.com/CyDragon80/node-xml-csharp-cereal/issues"
+  },
+  "homepage": "https://github.com/CyDragon80/node-xml-csharp-cereal#readme",
+  "devDependencies": {
+    "mocha": "^5.1.1",
+    "xml2js": "^0.4.19"
+  }
+}
