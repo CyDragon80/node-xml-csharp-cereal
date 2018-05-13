@@ -1,0 +1,131 @@
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Xml.Serialization;
+
+/*
+ * This a test class to serialize.
+ * It is the default test case, or test number zero.
+ * 
+ */
+
+namespace csharpxml.Test0
+{
+    // NOTE: if enum does not handle zero and enum prop is not given initial non-zero value, serializer throws.
+    public enum MyEnum { zero=0, one=1, two=2, three=3 };
+    public class TestClass : XmlTestObject<TestClass>
+    {
+        [XmlAttribute]
+        public string SomeAttr;
+        public MyEnum MyEnumProp;
+        public MyEnum[] MyEnumArray;
+        public bool MyBool;
+        public byte MyByte;
+        public int MyInt;
+        public uint MyUInt;
+        public long MyLong;
+        public double MyDouble;
+        public int? MyNullInt;
+        public int?[] MyNullIntArr; // NOTE: if this nullable array occurs before MyJagIntArray, MyJagIntArray's tags become "ArrayOfInt1" instead of "ArrayOfInt"
+        public int[] MyIntArray;
+        [XmlArrayItem(ElementName = "ArrayOfInt", IsNullable = false, Type = typeof(int[]))] // this prevents bug described above
+        public int[][] MyJagIntArray;
+        public MyEnum[][] MyJagEnumArray;
+
+        public SubTestClass MySubClass = new SubTestClass();
+        public SubTestClass[] MySubClassArray;
+        public SerializableDictionary<string, int> MyIntDict = new SerializableDictionary<string, int>();
+        public SerializableDictionary<string, int>[] MyIntDictArr;
+        public SerializableDictionary<string, SubTestClass> MySubClassDict = new SerializableDictionary<string, SubTestClass>();
+        public SerializableDictionary<string, MyEnum[]> MyEnumArrDict;
+        public SerializableDictionary<string, SerializableDictionary<string, int> > MyIntDictDict;
+        public SerializableDictionary<string, SerializableDictionary<string, int>[]> MyIntDictArrDict;
+
+        public override void PopulateTestObject(int subtest)
+        {
+            switch (subtest)
+            {
+                case 0:
+                    // run with constructor defaults
+                    break;
+                case 1:
+                    SomeAttr = "att";
+                    MyEnumProp = MyEnum.three;
+                    MyEnumArray = new MyEnum[] { MyEnum.one, MyEnum.two };
+                    MyBool = true;
+                    MyInt = 1;
+                    MyNullInt = 42;
+                    MyNullIntArr = new int?[] { 43, null, 45 };
+                    MyByte = byte.MaxValue;
+                    MyUInt = uint.MaxValue;
+                    MyLong = long.MaxValue;
+                    MyDouble = double.MaxValue;
+                    MyIntArray = new int[] { 3, 4, 5 };
+                    MyJagIntArray = new int[][]
+                    {
+                        new int[] { 6, 7, 8 },
+                        new int[] { 9, 10 },
+                    };
+                    MyJagEnumArray = new MyEnum[][]
+                    {
+                        new MyEnum[] { MyEnum.one, MyEnum.two},
+                        new MyEnum[] { MyEnum.three }
+                    };
+                    MySubClass.Populate(-1);
+                    MySubClassArray = new SubTestClass[2];
+                    for (int i = 0; i < MySubClassArray.Length; ++i)
+                    {
+                        MySubClassArray[i] = new SubTestClass();
+                        MySubClassArray[i].Populate(i);
+                    }
+                    MyIntDict.Add("first", 55);
+                    MyIntDict.Add("second", 65);
+                    MyIntDictArr = new SerializableDictionary<string, int>[2];
+                    for (int i = 0; i < MyIntDictArr.Length; ++i)
+                    {
+                        MyIntDictArr[i] = new SerializableDictionary<string, int>();
+                        MyIntDictArr[i].Add("item1-" + i.ToString(), i * 9);
+                        MyIntDictArr[i].Add("item2-" + i.ToString(), i * 19);
+                    }
+                    var sub = new SubTestClass();
+                    sub.Populate(11);
+                    MySubClassDict.Add("subclass", sub);
+                    MyEnumArrDict = new SerializableDictionary<string, MyEnum[]>();
+                    MyEnumArrDict.Add("EnumKey", new MyEnum[] { MyEnum.three, MyEnum.two, MyEnum.one });
+                    // good lord
+                    MyIntDictDict = new SerializableDictionary<string, SerializableDictionary<string, int>>();
+                    MyIntDictDict.Add("really", MyIntDict);
+                    // stop, please
+                    MyIntDictArrDict = new SerializableDictionary<string, SerializableDictionary<string, int>[]>();
+                    MyIntDictArrDict.Add("yes", MyIntDictArr);
+                    break;
+                default:
+                    break;
+            }
+        }
+    } // END CLASS: TestClass
+
+    public class SubTestClass
+    {
+        [XmlAttribute]
+        public int SubAttr;
+        [XmlAttribute]
+        public string SubAttr2;
+        /* serializer doesn't do nullable attributes
+        [XmlAttribute]
+        public int? SubAttr3;*/
+        public int MySubInt;
+        public string MySubStr;
+
+        public void Populate(int test)
+        {
+            SubAttr = test * 9;
+            SubAttr2 = "att_" + test.ToString();
+            //SubAttr3 = test * 42;
+            MySubInt = test * 30 + 15;
+            MySubStr = "SubClass string " + test.ToString();
+        }
+    } // END CLASS: SubTestClass
+
+} // END NAMESPACE

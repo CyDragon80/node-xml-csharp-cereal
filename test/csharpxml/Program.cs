@@ -59,15 +59,11 @@ namespace csharpxml
                 Console.WriteLine(" Test: " + testNumber.ToString() + " [" + subTestNumber.ToString() + "]");
                 Console.WriteLine(" File: " + filename);
                 // construct the test object for this test number
-                switch (testNumber)
+                TestObj = ListOfClasses.GetClassForTestNumber(testNumber);
+                if (TestObj==null)
                 {
-                    case 0:
-                        TestObj = (XmlTestObjectInterface)new TestClass();
-                        break;
-                    default:
-                        Console.WriteLine("Unknown test: " + testNumber.ToString());
-                        End(ERR_COMMANDLINE);
-                        break;
+                    Console.WriteLine("Unknown test: " + testNumber.ToString());
+                    End(ERR_COMMANDLINE);
                 }
                 // populate test object for this subtest
                 TestObj.PopulateTestObject(subTestNumber);

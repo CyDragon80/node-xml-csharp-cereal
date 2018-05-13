@@ -66,7 +66,8 @@ namespace csharpxml
             {
                 // Serialization
                 var s = new DataContractSerializer(typeof(T));
-                using (var w = File.OpenWrite(FilePath))
+                var settings = new XmlWriterSettings { Indent = true };
+                using (var w = XmlWriter.Create(FilePath, settings))
                 {
                     s.WriteObject(w, this);
                 }

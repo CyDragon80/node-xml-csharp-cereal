@@ -85,8 +85,9 @@ obj/
 _ReSharper*/
 [Tt]est[Rr]esult*
 .vs/
+.vscode/
 
-# misc junk (include *.exe ? but what if repo is for installer?)
+# misc junk
 *.bak
 *.dep
 *.lib
@@ -107,3 +108,4 @@ test-results/
 
 # temporary test xml
 /test/temp.xml
+

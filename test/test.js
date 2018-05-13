@@ -4,42 +4,37 @@ const csharp = require('./csharp-test');
 const path = require('path');
 const test_xml = path.join(__dirname,"temp.xml");
 
-// region "Supported XML librarys" -----
-// Must provide:
-// - SaveToXml(obj, XmlFactory, fname)
-// - LoadFromXml(XmlFactory, fname) returning resulting object
-const lib_xml2js = require('./test_xml2js');
+// "Supported XML librarys"
+const XmlLibs = require('./list_xml_libs');
 
-const XmlLibs = 
+// "TestClasses"
+const TestClassList = require('./list_test_classes');
+
+
+
+for (let i=0; i<XmlLibs.length; ++i)
 {
-    'xml2js': lib_xml2js,
-};
-// endregion "Supported XML librarys" -----
-
-// region "TestClasses" -----
-// Must provide GetFactory() returning XmlTemplateFactory
-const TestClass0 = require('./TestClass');
-
-const TestClassList =
-{
-    "Test0": TestClass0,
-};
-// endregion "TestClasses" -----
-
-// TODO - figure out how to loop each test on each xml library
-
-describe('C# Serialization with xml2js', function()
-{
-    describe('Test 0.0', function(done)
+    let cur_xml_obj = XmlLibs[i];
+    describe('C# Serialization with xml library: ' + cur_xml_obj.Name, function()
     {
-        it('should load test 0.0 xml successfully', function()
+        for (let t=0; t<TestClassList.length; ++t)
         {
-            //return csharp.PrepAndLoad(0,0,test_xml);
-            return RunTest(TestClass0,lib_xml2js,0,0);
-        });
+            let cur_class_obj = TestClassList[t];
+            describe('Class set: ' + cur_class_obj.Name, function()
+            {
+                for (let s=0; s<cur_class_obj.SubTests.length; ++s)
+                {
+                    let sub_test_obj = cur_class_obj.SubTests[s];
+                    it('should serialize with value set: ' + sub_test_obj.Name, function()
+                    {
+                        //return RunTest(TestClass0,lib_xml2js,0,0);
+                        return RunTest(cur_class_obj.Module, cur_xml_obj.Module, cur_class_obj.Number, sub_test_obj.Number);
+                    });
+                }
+            });
+        }
     });
-});
-
+}
 
 function RunTest(test_class,xml_lib,test_number,subtest_number)
 {

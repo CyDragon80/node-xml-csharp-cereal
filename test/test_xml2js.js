@@ -10,10 +10,10 @@ module.exports.SaveToXml = function(obj, XmlFactory, fname)
 {
     return new Promise((resolve,reject)=>
     {
-        var js_obj = XmlFactory.to_xml2js(obj);
+        var xml_obj = XmlFactory.to_xml2js(obj);
         var builder = new xml2js.Builder();
-        var xml = builder.buildObject(js_obj);
-        fs.writeFile(fname, xml, function(err)
+        var xml_data = builder.buildObject(xml_obj);
+        fs.writeFile(fname, xml_data, function(err)
         {
             if(err) reject(err);
             else resolve();
@@ -26,10 +26,10 @@ module.exports.LoadFromXml = function(XmlFactory, fname)
     return new Promise((resolve,reject)=>
     {
         var parser = new xml2js.Parser();
-        fs.readFile(fname, function(err, data)
+        fs.readFile(fname, function(err, xml_data)
         {
             if (err) reject(err);
-            else parser.parseString(data, function (err, result)
+            else parser.parseString(xml_data, function (err, xml_obj)
             {
                 if (err) reject(err);
                 else
@@ -37,7 +37,7 @@ module.exports.LoadFromXml = function(XmlFactory, fname)
                     var obj = null;
                     try
                     {
-                        obj = XmlFactory.from_xml2js(result);
+                        obj = XmlFactory.from_xml2js(xml_obj);
                         resolve(obj);
                     }
                     catch(e) { reject(e); }
