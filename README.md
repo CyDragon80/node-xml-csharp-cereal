@@ -139,7 +139,7 @@ factory.SimpleTypeEncoders['long'] = function(val, err_val)
     catch { return err_val; }
 }
 ```
-
+The default DateTime decoder/encoder uses ISO string and javascript Date object. The default TimeSpan uses string, as there is no built-in javascript  equivalent. Both DateTime and TimeSpan decode/encoder can be overriden to use other methods or libraries.
 ### XmlTemplate - Add Methods
 The XmlTemplate class provides add functions for the all of the XmlTemplateFactory's built-in types.
 Method|Description

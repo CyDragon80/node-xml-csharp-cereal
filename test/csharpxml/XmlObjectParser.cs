@@ -8,6 +8,8 @@ using System.Xml.Serialization;
 using System.IO;
 
 using System.Runtime.Serialization; // DataContractSerializer (which is opt-in vs XmlSerializer which is opt-out)
+using System.Xml.Schema;
+using System.Globalization;
 
 namespace csharpxml
 {
@@ -304,6 +306,75 @@ namespace csharpxml
         }
         #endregion
     }
+
+
+    // Try to mimick DataContractSerializer DateTime
+    [XmlRoot("DateTime")]
+    public class SerializableDateTime : IXmlSerializable
+    {
+        public DateTime Value;
+
+        public SerializableDateTime() { Value = default(DateTime); }
+        public SerializableDateTime(DateTime d) { Value = d; }
+        public SerializableDateTime(string s) { Value = DateTime.Parse(s); }
+
+        public XmlSchema GetSchema()
+        {
+            return null;
+        }
+
+        public void ReadXml(XmlReader reader)
+        {
+            reader.MoveToContent();
+            bool isEmptyElement = reader.IsEmptyElement;
+            reader.ReadStartElement();
+            if (!isEmptyElement)
+            {
+                var content = reader.ReadString();
+                //Value = XmlConvert.ToDateTime(content, XmlDateTimeSerializationMode.Unspecified);
+                Value = XmlConvert.ToDateTime(content); // though obsolete, does what DataContractSerializer seems to do?
+                reader.ReadEndElement();
+            }
+        }
+
+        public void WriteXml(XmlWriter writer)
+        {
+            //XmlDateTimeSerializationMode mode = (Value.Kind == DateTimeKind.Utc ? XmlDateTimeSerializationMode.Utc : XmlDateTimeSerializationMode.Local);
+            //writer.WriteString(XmlConvert.ToString(Value, XmlDateTimeSerializationMode.Unspecified));
+            writer.WriteString(XmlConvert.ToString(Value)); // though obsolete, does what DataContractSerializer seems to do?
+            //writer.WriteString(Value.ToString("yyyy-MM-ddTHH:mm:ss.fffffffzzz", CultureInfo.InvariantCulture)); // mono version?
+        }
+    } // END CLASS: SerializableDateTime
+
+    // Try to mimick DataContractSerializer TimeSpan
+    [XmlRoot("TimeSpan")]
+    public class SerializableTimeSpan : IXmlSerializable
+    {
+        public TimeSpan Value;
+        public SerializableTimeSpan() { Value = default(TimeSpan); }
+        public SerializableTimeSpan(TimeSpan t) { Value = t; }
+        public SerializableTimeSpan(string s) { Value = TimeSpan.Parse(s); }
+
+        public XmlSchema GetSchema() { return null; }
+
+        public void ReadXml(XmlReader reader)
+        {
+            reader.MoveToContent();
+            bool isEmptyElement = reader.IsEmptyElement;
+            reader.ReadStartElement();
+            if (!isEmptyElement)
+            {
+                var content = reader.ReadString();
+                Value = XmlConvert.ToTimeSpan(content);
+                reader.ReadEndElement();
+            }
+        }
+
+        public void WriteXml(XmlWriter writer)
+        {
+            writer.WriteString(XmlConvert.ToString(Value));
+        }
+    } // END CLASS: SerializableTimeSpan
 
 } // END NAMESPACE
 

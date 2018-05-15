@@ -42,6 +42,11 @@ namespace csharpxml.Test0
         public SerializableDictionary<string, SerializableDictionary<string, int> > MyIntDictDict;
         public SerializableDictionary<string, SerializableDictionary<string, int>[]> MyIntDictArrDict;
 
+        public SerializableDateTime MyTime;
+        public SerializableTimeSpan MySpan;
+        /*[XmlArrayItem(ElementName = "DateTime", Type = typeof(SerializableDateTime))]
+        public SerializableDateTime[] MyTimes;*/
+
         public override void PopulateTestObject(int subtest)
         {
             switch (subtest)
@@ -50,6 +55,16 @@ namespace csharpxml.Test0
                     // run with constructor defaults
                     break;
                 case 1:
+                    //var tm = new DateTime(2018, 12, 25, 13, 30, 15, 750, DateTimeKind.Utc);
+                    //var tm = new DateTime(2018, 12, 25, 13, 30, 15, 750, DateTimeKind.Local);
+                    var tm = new DateTime(2018, 12, 25, 13, 30, 15, 750);
+                    MyTime = new SerializableDateTime(tm);
+                    MySpan = new SerializableTimeSpan(TimeSpan.FromMilliseconds(123456789));
+                    /*MyTimes = new SerializableDateTime[]
+                    {
+                        new SerializableDateTime("5/30/2018 5:30PM"),
+                        new SerializableDateTime("5/30/2018 6:30PM")
+                    };*/
                     SomeAttr = "att";
                     MyEnumProp = MyEnum.three;
                     MyEnumArray = new MyEnum[] { MyEnum.one, MyEnum.two };
@@ -73,8 +88,8 @@ namespace csharpxml.Test0
                         new MyEnum[] { MyEnum.three }
                     };
                     MySubClass.Populate(-1);
-                    MySubClassArray = new SubTestClass[2];
-                    for (int i = 0; i < MySubClassArray.Length; ++i)
+                    MySubClassArray = new SubTestClass[3];
+                    for (int i = 0; i < MySubClassArray.Length-1; ++i)
                     {
                         MySubClassArray[i] = new SubTestClass();
                         MySubClassArray[i].Populate(i);

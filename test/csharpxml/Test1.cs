@@ -60,6 +60,11 @@ namespace csharpxml.Test1
         [DataMember]
         public Dictionary<string, Dictionary<string, int>[]> MyIntDictArrDict;
 
+        [DataMember]
+        public DateTime MyTime;
+        [DataMember]
+        public TimeSpan MySpan;
+
         public override void PopulateTestObject(int subtest)
         {
             switch (subtest)
@@ -68,6 +73,8 @@ namespace csharpxml.Test1
                     // run with constructor defaults
                     break;
                 case 1:
+                    MyTime = new DateTime(2018, 12, 25, 13, 30, 15, 750);
+                    MySpan = TimeSpan.FromMilliseconds(123456789);
                     //SomeAttr = "att";
                     MyEnumProp = MyEnum.three;
                     MyEnumArray = new MyEnum[] { MyEnum.one, MyEnum.two };
@@ -91,8 +98,8 @@ namespace csharpxml.Test1
                         new MyEnum[] { MyEnum.three }
                     };
                     MySubClass.Populate(-1);
-                    MySubClassArray = new SubTestClass[2];
-                    for (int i = 0; i < MySubClassArray.Length; ++i)
+                    MySubClassArray = new SubTestClass[3];
+                    for (int i = 0; i < MySubClassArray.Length-1; ++i)
                     {
                         MySubClassArray[i] = new SubTestClass();
                         MySubClassArray[i].Populate(i);

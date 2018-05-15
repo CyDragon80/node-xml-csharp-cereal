@@ -37,6 +37,7 @@ class SubTestObj
 
 // region Section 1 - Test class module imports
 const Test0 = require('./Test0');
+const Test1 = require('./Test1');
 // endregion Section 1 - Test class module imports
 
 
@@ -46,8 +47,8 @@ module.exports =
     new TestClassObj("Test0", 0, Test0)
     .add("Defaults", 0)
     .add("Set 1", 1),
-/*     new TestClassObj("Test1", 1, Test0)
+    new TestClassObj("Test1", 1, Test1)
     .add("Defaults", 0)
-    .add("Set 1", 1), */
+    .add("Set 1", 1),
 ];
 // endregion Section 2 Test class object list
