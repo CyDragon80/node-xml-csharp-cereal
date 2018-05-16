@@ -44,6 +44,8 @@ namespace csharpxml.Test1
         public int[][][] MyJagIntArray2;
         [DataMember]
         public MyEnum[][] MyJagEnumArray;
+        [DataMember]
+        public List<string> MyStrList;
 
         [DataMember]
         public SubTestClass MySubClass = new SubTestClass();
@@ -104,6 +106,9 @@ namespace csharpxml.Test1
                         new MyEnum[] { MyEnum.one, MyEnum.two},
                         new MyEnum[] { MyEnum.three }
                     };
+                    MyStrList = new List<string>();
+                    MyStrList.Add("List0");
+                    MyStrList.Add("List1");
                     MySubClass.Populate(-1);
                     MySubClassArray = new SubTestClass[3];
                     for (int i = 0; i < MySubClassArray.Length-1; ++i)

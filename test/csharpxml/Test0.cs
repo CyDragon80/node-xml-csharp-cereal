@@ -33,6 +33,7 @@ namespace csharpxml.Test0
         [XmlArrayItem(ElementName = "ArrayOfInt", IsNullable = false, Type = typeof(int[]))] // this prevents bug described above
         public int[][] MyJagIntArray;
         public MyEnum[][] MyJagEnumArray;
+        public List<string> MyStrList = new List<string>(); // fun fact, XmlSerializer will construct one regardless of whether any tag is there
 
         public SubTestClass MySubClass = new SubTestClass();
         public SubTestClass[] MySubClassArray;
@@ -93,6 +94,9 @@ namespace csharpxml.Test0
                         new MyEnum[] { MyEnum.one, MyEnum.two},
                         new MyEnum[] { MyEnum.three }
                     };
+                    MyStrList = new List<string>();
+                    MyStrList.Add("List0");
+                    MyStrList.Add("List1");
                     MySubClass.Populate(-1);
                     MySubClassArray = new SubTestClass[3];
                     for (int i = 0; i < MySubClassArray.Length-1; ++i)

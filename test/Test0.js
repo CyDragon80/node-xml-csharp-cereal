@@ -39,6 +39,7 @@ class TestClass
         this.MyJagIntArray=null; //public int[][] MyJagIntArray;
         this.MyJagIntArray2=null; //public int[][][] MyJagIntArray2;
         this.MyJagEnumArray=null; //public MyEnum[][] MyJagEnumArray;
+        this.MyStrList=null; //public List<string> MyStrList; - NOTE: it seems XmlSerializer will create a list on the other side regardless of whether a tag is actually present in XML
 
         this.MySubClass=new SubTestClass(); //public SubTestClass MySubClass
         this.MySubClassArray=null; //public SubTestClass[] MySubClassArray;
@@ -71,6 +72,7 @@ class TestClass
         temp.addInt('MyJagIntArray', ['int','ArrayOfInt']);
         temp.addInt('MyJagIntArray2', 3);
         temp.add('MyJagEnumArray', 'MyEnum', 2);
+        temp.addString('MyStrList', 1);
         temp.add('MySubClass', 'SubTestClass');
         temp.add('MySubClassArray', 'SubTestClass', 1);
         temp.add('MyIntDict', 'SerializableDictionaryOfStringInt32');

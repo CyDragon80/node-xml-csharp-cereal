@@ -37,6 +37,7 @@ class TestClass
         this.MyJagIntArray=null; //public int[][] MyJagIntArray;
         this.MyJagIntArray2=null; //public int[][][] MyJagIntArray2;
         this.MyJagEnumArray=null; //public MyEnum[][] MyJagEnumArray;
+        this.MyStrList=null; //public List<string> MyStrList;
 
         this.MySubClass=new SubTestClass(); //public SubTestClass MySubClass
         this.MySubClassArray=null; //public SubTestClass[] MySubClassArray;
@@ -69,6 +70,7 @@ class TestClass
         temp.addInt('MyJagIntArray', 2, xml.dc_ArrayNS); // enum usually doesn't have namespace
         temp.addInt('MyJagIntArray2', 3, xml.dc_ArrayNS);
         temp.add('MyJagEnumArray', 'MyEnum',2,xml.dc_noNS);
+        temp.addString('MyStrList', 1, xml.dc_ArrayNS);
         temp.add('MySubClass', 'SubTestClass');
         temp.add('MySubClassArray', 'SubTestClass',1,xml.dc_noNS);
         temp.add('MyIntDict', 'ArrayOfKeyValueOfstringint',0,xml.dc_ArrayNS);
