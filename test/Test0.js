@@ -37,6 +37,7 @@ class TestClass
         this.MyNullIntArr; //public int?[] MyNullIntArr;
         this.MyIntArray=null; //public int[] MyIntArray;
         this.MyJagIntArray=null; //public int[][] MyJagIntArray;
+        this.MyJagIntArray2=null; //public int[][][] MyJagIntArray2;
         this.MyJagEnumArray=null; //public MyEnum[][] MyJagEnumArray;
 
         this.MySubClass=new SubTestClass(); //public SubTestClass MySubClass
@@ -68,6 +69,7 @@ class TestClass
         temp.addInt('MyIntArray', 1)
         //temp.addInt('MyJagIntArray', 2); // jagged array has two dimensions
         temp.addInt('MyJagIntArray', ['int','ArrayOfInt']);
+        temp.addInt('MyJagIntArray2', 3);
         temp.add('MyJagEnumArray', 'MyEnum', 2);
         temp.add('MySubClass', 'SubTestClass');
         temp.add('MySubClassArray', 'SubTestClass', 1);

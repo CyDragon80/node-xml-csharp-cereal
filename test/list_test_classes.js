@@ -38,17 +38,27 @@ class SubTestObj
 // region Section 1 - Test class module imports
 const Test0 = require('./Test0');
 const Test1 = require('./Test1');
+const Test2 = require('./Test2');
+const Test3 = require('./Test3');
 // endregion Section 1 - Test class module imports
 
 
 // region Section 2 Test class object list
 module.exports =
 [
-    new TestClassObj("Test0", 0, Test0)
+    new TestClassObj("General XmlSerializer", 0, Test0)
     .add("Defaults", 0)
     .add("Set 1", 1),
-    new TestClassObj("Test1", 1, Test1)
+    new TestClassObj("General DataContractSerializer", 1, Test1)
     .add("Defaults", 0)
     .add("Set 1", 1),
+    new TestClassObj("Derived XmlSerializer", 2, Test2)
+    .add("Defaults", 0)
+    .add("Normal Set", 1)
+    .add("Derived Set", 2),
+    new TestClassObj("Derived DataContractSerializer", 3, Test3)
+    .add("Defaults", 0)
+    .add("Normal Set", 1)
+    .add("Derived Set", 2),
 ];
 // endregion Section 2 Test class object list

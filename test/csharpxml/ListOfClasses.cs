@@ -20,6 +20,10 @@ namespace csharpxml
                     return (XmlTestObjectInterface)new Test0.TestClass();
                 case 1:
                     return (XmlTestObjectInterface)new Test1.TestClass();
+                case 2:
+                    return (XmlTestObjectInterface)new Test2.TestClass();
+                case 3:
+                    return (XmlTestObjectInterface)new Test3.TestClass();
                 default:
                     return null;
             }

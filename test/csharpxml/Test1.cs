@@ -41,6 +41,8 @@ namespace csharpxml.Test1
         [DataMember]
         public int[][] MyJagIntArray;
         [DataMember]
+        public int[][][] MyJagIntArray2;
+        [DataMember]
         public MyEnum[][] MyJagEnumArray;
 
         [DataMember]
@@ -91,6 +93,11 @@ namespace csharpxml.Test1
                     {
                         new int[] { 6, 7, 8 },
                         new int[] { 9, 10 },
+                    };
+                    MyJagIntArray2 = new int[][][]
+                    {
+                        new int[][]{ new int[] {11,22}, new int[] {33,44} },
+                        new int[][]{ new int[] {55,66}, new int[] {77,88} },
                     };
                     MyJagEnumArray = new MyEnum[][]
                     {

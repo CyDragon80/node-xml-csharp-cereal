@@ -16,24 +16,14 @@ If needed, code could be modified to store some arguments to pass to the constru
 */
 
 /* TODO -
--attributes on array elements? elements probably classes as primitives don't have members?
 -simple type encoders/decoders should be in object in case we want to add more info to simple types?
--Derived type handling?
-    <!-- Manager class derives from Employee -->
-    <Employees>
-        <Employee>
-            <Name>Haley</Name>
-        </Employee>
-        <Employee xsi:type = "Manager">
-            <Name>Ann</Name>
-            <Level>3</Level>
-        <Employee>
-    </Employees >
+-rework error reporting for simpletypes? decode(val, prop_info, _state) ? prop_info.errDec(msg) ? decode(val, some_class_for_errs)?
+-carry a path in _state?
  */
 /*
 DataContractSerializer notes (if we go there)
 -Root tag notes full class namespace xmlns="http://schemas.datacontract.org/2004/07/csharpxml.Test1".
--All tag are in alphabetical order.
+-All tag are in alphabetical order, AND derived class tags are after parent tags.
 -No tags can be omitted, nulls use attribute nil="true".
 -Arrays and dictionaries are tagged xmlns:d2p1="http://schemas.microsoft.com/2003/10/Serialization/Arrays".
 -Jagged Array and dictionary type tags follow different naming convention compared to XmlSerializer.
@@ -301,7 +291,7 @@ class DictionaryFactory  // For now maybe we don't expose internal plumbing of g
         if (!(key_prop instanceof module.exports.XmlTemplateItem)) throw new Error('DictionaryFactory key_class must be XmlTemplateItem');
         if (!(value_prop instanceof module.exports.XmlTemplateItem)) throw new Error('DictionaryFactory value_class must be XmlTemplateItem');
         // TODO - ACTUALLY for a generic {} dictionary, the key must be a string or representable as a string? At least for now.
-        // Actually any simple type that can be used as an object prop name should work?
+        // Actually any simple type that can be used as a js object prop name should work?
         //if (key_prop.ClassName!='string') throw new Error('DictionaryFactory: At this time key_class must be "string"');
         this.PairName = pair_name;
         this.KeyProp = key_prop;
@@ -320,7 +310,7 @@ class DictionaryFactory  // For now maybe we don't expose internal plumbing of g
         // create a temporary template for this particular KeyValuePair
         var args = [this.KeyProp.Name, key, this.ValueProp.Name, value];
         var t = new module.exports.XmlTemplate(KeyValuePairStub, args);
-        t.add(this.KeyProp);    // TODO - do these need to be clones? just pass the props?
+        t.add(this.KeyProp);    // TODO - do these need to be clones? is it safe to just pass the original props?
         t.add(this.ValueProp);
         return t;
     }
@@ -360,20 +350,21 @@ class ArrayFactory
         }
         else this.Levels = levels;
     }
+    clone(new_base_level)
+    {
+        var n = new ArrayFactory(this.Levels);
+        if (new_base_level!=undefined) n.Levels[0] = new_base_level;
+        return n;
+    }
     getTopClass() { return this.Levels[this.Levels.length-1]; }
     isOneDim() { return (this.Levels==null || this.Levels.length==1); }
-    nextProp(cur_prop) // call in from?
+    nextTemp(cur_prop) // call in decode/encode to handle extra layer
     {
-        if (this.isOneDim()) return cur_prop; // hit the end, process as normal array
-        var NextName = this.getTopClass();
-        var prop = cur_prop.clone(cur_prop.Name, NextName);
-        prop.ArrayData = new ArrayFactory(this.Levels.slice(0, -1));
-        return prop;
-    }
-    nextTemp(prop_info) // call in decode/encode to handle extra layer
-    {
+        var nx = new ArrayFactory(this.Levels.slice(0, -1)); // get next level
+        var p = cur_prop.clone('Items', nx.getTopClass());
+        p.ArrayData = nx;
         var t = new module.exports.XmlTemplate(ArrayStub);
-        t.add(prop_info.clone('Items', prop_info.ArrayData.getTopClass()));
+        t.add(p);
         t.XmlPassthrough = 'Items'; // in xml processing, this class is transparent, the value of Items replaces the class itself in XML
         return t;
     }
@@ -401,14 +392,14 @@ class XmlTemplateItem
         else if (Array.isArray(arr_levels)) this.ArrayData = new ArrayFactory(arr_levels, this.ClassName);
         else if (arr_levels > 0) this.ArrayData = new ArrayFactory(module.exports.arrLevels(arr_levels,this.ClassName,(namespace!=null)), this.ClassName);
         else this.ArrayData = null;
+        this.NameSpace = namespace; // DataContract
         this.NullableData = null;
         this.AttrData = null;
-        this.NameSpace = namespace; // DataContract
         // temp runtime props
         //this.DictionaryData = null; // can hold a DictionaryFactory in a KeyValuePair during XML processing
         // Add a member for tracking XML element vs attribute?
     }
-    toString() { return this.Name; }
+    //toString() { return this.Name; }
     clone(prop_name, class_name, arr_levels, namespace)
     {
         if (prop_name==undefined) prop_name = this.Name;
@@ -417,7 +408,7 @@ class XmlTemplateItem
         if (namespace==undefined) namespace = this.NameSpace;
         var n = new module.exports.XmlTemplateItem(prop_name, class_name, arr_levels, namespace);
         n.NullableData = this.NullableData;
-        n.AttrData = this.AttrData; // TODO - AttrData ?
+        n.AttrData = this.AttrData;
         return n;
     }
     nullable()
@@ -457,8 +448,38 @@ class XmlTemplate
         //this.XmlPassthrough = null; // name of prop that is used as abstract passthrough for XML processing
     }
     /**
+     * Gets the name of the class being mapped by this XML template.
+     * @return {string} Name of the class that this template maps
+     */
+    getName() { return this.ClassConstructor.name; }
+    /**
+     * Changes the class to which this template instance refers (handy for creating derived class templates)
+     * @param {Function} parent_class Class function (essentially the constructor)
+     * @param {?any[]} [constructor_args=null] Arguments to feed constructor when creating a new instance
+     */
+    changeClass(parent_class, constructor_args)
+    {
+        this.ClassConstructor = parent_class;
+        this.ConstructorArgs = constructor_args || null;
+        return this; // should we just return this for possible chaining ?
+    }
+    /**
+     * Makes a shallow copy of this template. You can specify a different class or constructor args if you want.
+     * @param {Function} [parent_class] Class function (essentially the constructor)
+     * @param {?any[]} [constructor_args] Arguments to feed constructor when creating a new instance
+     * @return {XmlTemplate} The shallow clone of this
+     */
+    clone(parent_class, constructor_args)
+    {
+        if (parent_class==undefined) parent_class = this.ClassConstructor;
+        if (constructor_args==undefined) constructor_args = this.ConstructorArgs; // shallow copy? since it's arbitary, deep copy might be a bit much?
+        var n = new XmlTemplate(parent_class, this.ConstructorArgs);
+        n.Props = this.Props.slice(); // shallow copy good enough?
+        //this.Props.forEach(function(item){ n.Props.push(item.clone()) }); // deep copy safer?
+        return n;
+    }
+    /**
      * Returns a new instance of the class associated with this template.
-     *
      * @param {...any} constructor_args If parameters given, they are passed to constructor; otherwise any stored ConstructorArgs are used.
      * @returns {Object} New instance of ClassConstructor (using ConstructorArgs if any)
      */
@@ -471,10 +492,10 @@ class XmlTemplate
     }
     /**
      * Add property to this class XML template.
-     *
      * @param {string|XmlTemplateItem} prop_name Property Name or instance of Property XML template. If passing full item template, other parameters are ignored.
      * @param {string|Function|Object} class_name Class Name or Class instance or Class function of the property.
      * @param {number|string[]} [arr_levels=0] Number of dimensions or array of tag names (if not defined, assumes no array)
+     * @param {?Object} namespace XML Namespace for DataContractSerializer represented as {uri:"",prefix:""}
      * @returns {XmlTemplateItem} instance of the new property XML template that was added
      */
     add(prop_name, class_name, arr_levels, namespace)
@@ -509,11 +530,12 @@ class XmlTemplate
         var prop_name = ; // need to either determine original name or pass separately?
         this.add(prop_name, class_name);
     }*/
+    sortByName() {this.Props.sort(function(a,b) { return (a.Name<b.Name ? -1 : (a.Name>b.Name ? 1 : 0)); });}
     convToDataContract(class_namespace)
     {
-        // sort Props
-        this.Props.sort();
-        // make everything nullable?
+        // sort Props - THIS could mess up derived classes, make a separate sort for now or look into selectable sorting?
+        //this.Props.sort(function(a,b) { return (a.Name<b.Name ? -1 : (a.Name>b.Name ? 1 : 0)); });
+        // make everything nullable? TODO - perhaps create a separate flag for this?
         this.Props.forEach(function(item)
         {
             item.nullable();
@@ -552,7 +574,7 @@ class XmlTemplate
                     if (xml_node.length<1) return;
                     else xml_node = xml_node[0];
                 }
-                if (xml_node.$ && xml_node.$[_state.XmlInstance+':nil']=='true') // regardless of being nullable, if tagged nil make it null
+                if (xml2js_GetAttr(xml_node, _state.XmlInstance+':nil')=='true') // regardless of being nullable, if tagged nil make it null
                 {
                     new_obj[prop.Name] = null;
                     return;
@@ -570,31 +592,31 @@ class XmlTemplate
                 {
                     // xml2js will turn our type tags into a property containing the sub nodes as another array.
                     // At this point we have {type:[value,...]}
-                    var arrProp = prop.ArrayData.nextProp(prop);
-                    var node_arr = xml_node[_state.Prefix+arrProp.ClassName];
+                    //var node_arr = xml_node[_state.Prefix+prop.ClassName];
+                    var node_arr = xml_node[_state.Prefix+prop.ArrayData.getTopClass()];
                     if (node_arr==undefined)
                     {
-                        if (this.XmlPassthrough==arrProp.Name) new_obj[arrProp.Name] = null;
+                        if (this.XmlPassthrough==prop.Name) new_obj[prop.Name] = null;
                         return;
                     }
                     if (!Array.isArray(node_arr)) node_arr = [node_arr]; // in case it isn't in an array
                     new_item = [];
                     node_arr.forEach(function(item)
                     {
-                        if (item.$ && item.$[_state.XmlInstance+':nil']=='true') new_item.push(null);
-                        else
-                        {
-                            var temp = factory._decodeType(item, arrProp, '_from_xml2js', opts, _state);
-                            if (temp!==undefined) new_item.push(temp); // null is a valid answer
-                        }
+                        var mods = {
+                            DerivedClass: xml2js_GetAttr(item,_state.XmlInstance+':type'),
+                            IsNull: (xml2js_GetAttr(item, _state.XmlInstance+':nil')=='true') };
+                        var temp = factory._decodeType(item, prop, mods, '_from_xml2js', opts, _state);
+                        if (temp!==undefined) new_item.push(temp); // null is a valid answer
                     }, this);
-                    new_obj[arrProp.Name] = new_item;
-                    /* if (new_item.length>0) new_obj[arrProp.Name] = new_item; // null is a valid answer
-                    else new_obj[arrProp.Name] = null; */
+                    new_obj[prop.Name] = new_item;
+                    /* if (new_item.length>0) new_obj[prop.Name] = new_item; // null is a valid answer
+                    else new_obj[prop.Name] = null; */
                 }
                 else // we expect a single value
                 {
-                    new_item = factory._decodeType(xml_node, prop, '_from_xml2js', opts, _state);
+                    var mods = { DerivedClass: xml2js_GetAttr(xml_node,_state.XmlInstance+':type') }; // nil is handled already up top
+                    new_item = factory._decodeType(xml_node, prop, mods, '_from_xml2js', opts, _state);
                     if (new_item!==undefined) new_obj[prop.Name] = new_item; // null is a valid answer
                 }
                 _state.Prefix = prev_prefix;
@@ -635,7 +657,6 @@ class XmlTemplate
             {
                 if (!Array.isArray(cur_data)) cur_data = [cur_data];
                 // xml2js needs typed arrays presented to it as {type:[value,...]}
-                var arrProp = prop.ArrayData.nextProp(prop);
                 var arr = [];
                 cur_data.forEach(function(item)
                 {
@@ -643,27 +664,27 @@ class XmlTemplate
                     if (item==null) arr_item = { $: { [_state.XmlInstance+':nil']:'true' } }; // null array items must be listed
                     else
                     {
-                        arr_item = factory._encodeType(item, arrProp, '_to_xml2js', opts, _state);
-                        if (arr_item===undefined) throw new Error('XmlTemplate._to_xml2js could not generate "' + arrProp.ClassName +'"');
+                        var mods = {};
+                        arr_item = factory._encodeType(item, prop, mods, '_to_xml2js', opts, _state);
+                        if (arr_item===undefined) throw new Error('XmlTemplate._to_xml2js could not generate "' + prop.ClassName +'"');
+                        if (mods.DerivedClass) xml2js_AddAttr(arr_item, _state.XmlInstance+':type', mods.DerivedClass);
                     }
                     arr.push(arr_item);
                 },this);
                 var wrap = {};
-                wrap[_state.Prefix+arrProp.ClassName] = arr;
+                wrap[_state.Prefix+prop.ArrayData.getTopClass()] = arr;
                 new_item = wrap;
                 if (this.XmlPassthrough) new_obj[prop.Name] = new_item;
-                else new_obj[prev_prefix+arrProp.Name] = new_item;
+                else new_obj[prev_prefix+prop.Name] = new_item;
             }
             else    // single node is pretty straight forward for xml2js
             {
+                var mods = {};
                 var new_item;
-                new_item = factory._encodeType(cur_data, prop,'_to_xml2js', opts, _state);
+                new_item = factory._encodeType(cur_data, prop, mods, '_to_xml2js', opts, _state);
                 if (new_item===undefined) throw new Error('XmlTemplate._to_xml2js could not generate "' + prop.ClassName+'"');
-                if (prop.AttrData && new_item != null)
-                {
-                    //new_obj.$ = Object.assign({ [prop.Name]:new_item }, new_obj.$); // easier, but reverses order?
-                    xml2js_AddAttr(new_obj, prop.Name, new_item);
-                }
+                if (mods.DerivedClass) xml2js_AddAttr(new_item, _state.XmlInstance+':type', mods.DerivedClass);
+                if (prop.AttrData && new_item != null) xml2js_AddAttr(new_obj, prop.Name, new_item);
                 else if (this.XmlPassthrough) new_obj[prop.Name] = new_item;
                 else new_obj[prev_prefix+prop.Name] = new_item;
             }
@@ -681,7 +702,6 @@ class XmlTemplateFactory
 {
     /**
      * Creates an instance of XmlTemplateFactory.
-     *
      * @param {...Function|XmlTemplate} [templates] Variable number of class functions (with static GetXmlTemplate), or XmlTemplate's, or arrays of either.
      */
     constructor(...templates)
@@ -741,7 +761,6 @@ class XmlTemplateFactory
     }
     /**
      * Add a class XML template to the factory.
-     *
      * @param {Function|XmlTemplate} xml_template Class function (with static GetXmlTemplate) or XmlTemplate instance.
      */
     add(xml_template)
@@ -750,7 +769,7 @@ class XmlTemplateFactory
         if (typeof(xml_template) == 'function' && typeof(xml_template.GetXmlTemplate) == 'function') xml_template = xml_template.GetXmlTemplate();
         // Make sure we have a XmlTemplate instance at this point
         if (!(xml_template instanceof module.exports.XmlTemplate)) throw new Error('XmlTemplateFactory.add only takes instances of XmlTemplate OR class functions with static GetXmlTemplate()');
-        this.XmlTemplates[xml_template.ClassConstructor.name] = xml_template;
+        this.XmlTemplates[xml_template.getName()] = xml_template;
         return this;
     }
     /**
@@ -806,7 +825,6 @@ class XmlTemplateFactory
     }
     /**
      * Finds a class XML template from the factory's collection.
-     *
      * @param {string|Object|Function} class_name Name, instance, or class function of the XML class template to find
      * @returns {?XmlTemplate} Returns the XML template if found, otherwise returns null
      */
@@ -819,18 +837,20 @@ class XmlTemplateFactory
     }
     /**
      * Decodes a given property from XML value to object value
+     * @private
      * @param {any} obj Instance of the property to be decoded
      * @param {XmlTemplateItem} prop_info XML template for the give property
+     * @param {Object} mods XML Modifiers such as 'type'
      * @param {string} from_method Name of the function to call on prop_info to process next level of XML processing
      * @param {Object} opts Options to pass through to next level of XML processing
      * @param {Object} _state State to pass through to next level of XML processing
      * @return {any} Value of the decoded type (could be simple type or another object)
      */
-    _decodeType(obj, prop_info, from_method, opts, _state)
+    _decodeType(obj, prop_info, mods, from_method, opts, _state)
     {
-        if (obj==null) return null;
+        if (obj==null || mods.IsNull) return null;
         // check for jagged array
-        if (prop_info.ArrayData && prop_info.ClassName != prop_info.ArrayData.getTopClass())
+        if (prop_info.ArrayData && !prop_info.ArrayData.isOneDim())
         {
             var tp = prop_info.ArrayData.nextTemp(prop_info);
             var new_item = tp[from_method](this, obj, opts, _state);
@@ -875,25 +895,29 @@ class XmlTemplateFactory
         var func = this.SimpleTypeDecoders[prop_info.ClassName];
         if (func != undefined) return func(obj);
         // check registered class types
-        if (!obj) return null; // could be empty string
-        var tp = this.find(prop_info.ClassName);
-        if (tp==null) return null;  // return undefined to ignore, null to set obj instance to null, or should we throw error?
+        if (!obj) // TODO - is this really a thing? a string is a simple type?
+            return null; // if obj is XML empty string?
+        var cn = (mods.DerivedClass ? mods.DerivedClass : prop_info.ClassName);
+        var tp = this.find(cn);
+        if (tp==null) throw new Error('XmlTemplateFactory cannot find type '+cn);  // return undefined to ignore, null to set obj instance to null, or should we throw error?
         return tp[from_method](this, obj, opts, _state);
     }
     /**
      * Encodes an object property value into XML value
+     * @private
      * @param {any} obj Property value to encode
      * @param {XmlTemplateItem} prop_info Template describing the property to encode
+     * @param {Object} mods XML Modifiers such as 'type' or 'nil' etc
      * @param {string} to_method Name of prop_info function to call to process next level of XML processing
      * @param {Object} opts Options to pass through to next level of XML processing
      * @param {Object} _state state to pass through to next level of XML processing
      * @return {any} Value for use in XML
      */
-    _encodeType(obj, prop_info, to_method, opts, _state)
+    _encodeType(obj, prop_info, mods, to_method, opts, _state)
     {
-        if (obj==null) return null;
+        if (obj==null) return null; // could set mods.IsNull=true, but probably faster/easier to check return or obj directly
         // check for jagged array
-        if (prop_info.ArrayData && prop_info.ClassName != prop_info.ArrayData.getTopClass())
+        if (prop_info.ArrayData && !prop_info.ArrayData.isOneDim())
         {
             var tp = prop_info.ArrayData.nextTemp(prop_info);
             var stub_obj = {Items: obj};
@@ -910,13 +934,12 @@ class XmlTemplateFactory
         if (dict_factory)
         {
             // obj is a {} where property names are keys
-            var keys = Object.getOwnPropertyNames(obj);
             var arr = [];
-            keys.forEach(function(k)
+            for (let k in obj) // just enumerable object props?
             {
                 var stub = dict_factory.createPairStub(k, obj[k]);
                 arr.push(stub);
-            });
+            }
             var tp = dict_factory.createDictTemplate(prop_info.ClassName);
             return tp[to_method](this, {Items:arr}, opts, _state);
         }
@@ -928,11 +951,10 @@ class XmlTemplateFactory
             if (typeof(enum_obj.getEnumName)=='function') n = enum_obj.getEnumName(obj);
             else
             {
-                var keys = Object.getOwnPropertyNames(enum_obj);
-                keys.forEach(function(k)
+                for (let k in enum_obj) // just enumerable object props?
                 {
-                    if (enum_obj[k]==obj) n = k;
-                });
+                    if (enum_obj[k]==obj) { n = k; break; }
+                }
             }
             // if it cannot find enum name, do we error or just use the raw value?
             if (n==null) throw new Error(prop_info.ClassName + ' does not define "' + obj +'"');
@@ -942,13 +964,26 @@ class XmlTemplateFactory
         var func = this.SimpleTypeEncoders[prop_info.ClassName];
         if (func != undefined) return func(obj);
         // check class types
-        var tp = this.find(prop_info.ClassName);
-        if (tp==null) return null;  // return undefined to throw, or null to include it as null tag?
+        var otp = this.find(prop_info.ClassName);
+        var tp = this._checkForDerived(obj, otp);
+        //if (tp==null) return undefined;  // return undefined to throw, or null to include it as null tag?
+        if (tp==null) throw new Error('XmlTemplateFactory cannot find type '+cn);
+        mods.DerivedClass = (otp === tp ? null : tp.getName());
         return tp[to_method](this, obj, opts, _state);
+    }
+    _checkForDerived(obj, tp)
+    {
+        if (tp==null) return null; // don't have base, so bail
+        if (!module.exports.IsClassInstance(obj)) return tp; // not a class, no change
+        var obj_name = obj.constructor.name; // get class name of the current data instance
+        if (obj_name == tp.getName()) return tp; // data is the expected class, no change
+        // safety check - make sure the class derives from the prop's class?
+        if (!(Object.getPrototypeOf(obj) instanceof tp.ClassConstructor)) throw new Error("Not derived class: Data is " + obj_name + ", but property is " + prop.ClassName);
+        // create temporary prop of derived class name
+        return this.find(obj_name);
     }
     /**
      * Creates a new class instance from the given object from xml2js.
-     *
      * @param {Object} xml2js_obj Object produced by xml2js from XML.
      * @param {Object} [options] Object of options to use for deserialization (specific to this function).
      * @returns {Object} An instance of the object deserialized from the XML root.
@@ -974,7 +1009,6 @@ class XmlTemplateFactory
     }
     /**
      * Creates a new object for xml2js to use from given instance of a known class.
-     *
      * @param {Object} root_obj Instance of a class known to this factory to be serialized.
      * @param {Object} [options] Object of options to use for serialization (specific to this function).
      * @returns {Object} Object that xml2js can use to generate XML.
@@ -1007,6 +1041,7 @@ class XmlTemplateFactory
 module.exports.XmlTemplateFactory = XmlTemplateFactory;
 
 
+// region "xml2js helpers"
 function xml2js_FindNS(node, ns)
 {
     if (node && node.$)
@@ -1025,6 +1060,10 @@ function xml2js_FindNS(node, ns)
     }
     return null;
 }
+function xml2js_GetAttr(node, n)
+{
+    return (node && node.$) ? node.$[n] : undefined;
+}
 function xml2js_AddAttr(node, n, v)
 {
     if (node)
@@ -1037,3 +1076,4 @@ function xml2js_AddAttrBack(node, n, v)
 {
     if (node) node.$ = Object.assign({ [n]:v }, node.$);
 }
+// endregion "xml2js helpers"

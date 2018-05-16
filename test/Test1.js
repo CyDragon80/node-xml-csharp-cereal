@@ -35,6 +35,7 @@ class TestClass
         this.MyNullIntArr; //public int?[] MyNullIntArr;
         this.MyIntArray=null; //public int[] MyIntArray;
         this.MyJagIntArray=null; //public int[][] MyJagIntArray;
+        this.MyJagIntArray2=null; //public int[][][] MyJagIntArray2;
         this.MyJagEnumArray=null; //public MyEnum[][] MyJagEnumArray;
 
         this.MySubClass=new SubTestClass(); //public SubTestClass MySubClass
@@ -66,6 +67,7 @@ class TestClass
         temp.addInt('MyIntArray',1, xml.dc_ArrayNS);
         //temp.addInt('MyJagIntArray', 2); // jagged array has two dimensions
         temp.addInt('MyJagIntArray', 2, xml.dc_ArrayNS); // enum usually doesn't have namespace
+        temp.addInt('MyJagIntArray2', 3, xml.dc_ArrayNS);
         temp.add('MyJagEnumArray', 'MyEnum',2,xml.dc_noNS);
         temp.add('MySubClass', 'SubTestClass');
         temp.add('MySubClassArray', 'SubTestClass',1,xml.dc_noNS);
@@ -78,6 +80,7 @@ class TestClass
         temp.add('MyIntDictArrDict', 'ArrayOfArrayOfKeyValueOfstringint',0,xml.dc_ArrayNS);
         temp.addDateTime('MyTime');
         temp.addTimeSpan('MySpan');
+        temp.sortByName(); // cheat to avoid re-ordering these properly (won't be an option with derived classes)
         temp.convToDataContract("http://schemas.datacontract.org/2004/07/csharpxml.Test1");
         return temp;
     }

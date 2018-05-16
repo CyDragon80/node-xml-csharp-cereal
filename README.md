@@ -188,7 +188,7 @@ temp.addString('SomeAttr').attr();
 ```
 ### XmlTemplateFactory - Add Enum
 There are three ways to decode/encode an enumeration.
-1. Add simple object representation of the enum to factory.
+1. Add a simple object representation of the enum to factory.
 ```javascript
 var MyEnumSimple = { zero:0, one:1, two:2, three:3 };
 factory.addEnum('MyEnum', MyEnumSimple);
@@ -208,7 +208,7 @@ factory.SimpleTypeEncoders['MyEnum'] = function(val, err_val)
     return lut[val];
 }
 ```
-3. Add object that defines getEnumValue(*name*) and getEnumName(*value*) functions to factory.
+3. Add object or class that defines getEnumValue(*name*) and getEnumName(*value*) functions to factory.
 ```javascript
 factory.addEnum('MyEnum', MyEnumExplicit);
 const MyEnumExplicit =
@@ -227,7 +227,7 @@ const MyEnumExplicit =
 ```
 
 ### XmlTemplateFactory - Add Object as Implicit Dictionary
-One can certainly construct an explicit dictionary class with explicit templates, but many may opt to use an object whose property names are used as dictionary keys. (At this time keys should probably be a simple type when using implicit dictionary.)
+One can certainly construct an explicit dictionary class with explicit templates, but many may opt to use an object whose enumerable property names are used as dictionary keys. (At this time keys should probably be a simple type when using implicit dictionary.)
 Basically you need to register a class with factory that spells out the key-value pair tag name and property info for the key and value.
 ```javascript
 // longest form

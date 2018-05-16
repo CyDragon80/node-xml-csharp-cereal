@@ -26,6 +26,7 @@ namespace csharpxml.Test0
         public uint MyUInt;
         public long MyLong;
         public double MyDouble;
+        public int[][][] MyJagIntArray2; // moving this up here to avoid tag renaming by nullables below
         public int? MyNullInt;
         public int?[] MyNullIntArr; // NOTE: if this nullable array occurs before MyJagIntArray, MyJagIntArray's tags become "ArrayOfInt1" instead of "ArrayOfInt"
         public int[] MyIntArray;
@@ -81,6 +82,11 @@ namespace csharpxml.Test0
                     {
                         new int[] { 6, 7, 8 },
                         new int[] { 9, 10 },
+                    };
+                    MyJagIntArray2 = new int[][][]
+                    {
+                        new int[][]{ new int[] {11,22}, new int[] {33,44} },
+                        new int[][]{ new int[] {55,66}, new int[] {77,88} },
                     };
                     MyJagEnumArray = new MyEnum[][]
                     {
