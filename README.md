@@ -123,6 +123,7 @@ temp.add('MyHex', 'hex');
 const Long = require("long");
 // Overriding default int64 handlers
 //  where factory = new XmlTemplateFactory(...)
+factory.SimpleTypeDecoders['Int64'] =
 factory.SimpleTypeDecoders['long'] = function(val, err_val)
 {
     // parse XML value into Long instance
@@ -130,6 +131,7 @@ factory.SimpleTypeDecoders['long'] = function(val, err_val)
     try { return Long.fromValue(val, false); }
     catch { return err_val; }
 }
+factory.SimpleTypeEncoders['Int64'] =
 factory.SimpleTypeEncoders['long'] = function(val, err_val)
 {
     // output Long as string for XML node

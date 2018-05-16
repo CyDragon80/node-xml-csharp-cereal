@@ -1,6 +1,6 @@
 'use strict';
 /**
- * Node.js XML serializer with an eye toward C# XmlSerializer interop
+ * Node.js XML serializer with an eye toward limited C# XmlSerializer compatibility
  * @module xml-csharp-cereal
  */
 
@@ -10,13 +10,13 @@ module.exports.getVersion = function getVersion() { return '0.0.0'; }
 /* xml-csharp-cereal.js
 This module is to aid in the serializing of XML to and from classes in a fashion similar to C#.
 However we must create xml template classes to describe the structure and aid in the process.
-It is assumed all arrays have elements of the same type.
+It is assumed all arrays have elements of the same type, or base type.
 During parsing from XML, class constructors are called without arguments (unless a default set is stored in its template).
-If needed, code could be modified to store some arguments to pass to the constructor in the XmlTemplate.
 */
 
 /* TODO -
--simple type encoders/decoders should be in object in case we want to add more info to simple types?
+-try to make DataContract setup easier?
+-simple type encoders/decoders should be in object in case we want to add more info to simple types? or separate meta objects?
 -rework error reporting for simpletypes? decode(val, prop_info, _state) ? prop_info.errDec(msg) ? decode(val, some_class_for_errs)?
 -carry a path in _state?
  */
@@ -510,6 +510,7 @@ class XmlTemplate
         return obj; // return XmlTemplateItem in case it is useful at some point?
     }
     // common type add helpers
+    addBool(prop_name, arr_levels, namespace) {return this.add(prop_name,'bool',arr_levels,namespace)}
     addString(prop_name, arr_levels, namespace) {return this.add(prop_name,'string',arr_levels,namespace)}
     addSByte(prop_name, arr_levels, namespace) {return this.add(prop_name,'sbyte',arr_levels,namespace)}
     addByte(prop_name, arr_levels, namespace) {return this.add(prop_name,'byte',arr_levels,namespace)}
@@ -521,9 +522,14 @@ class XmlTemplate
     addULong(prop_name, arr_levels, namespace) {return this.add(prop_name,'ulong',arr_levels,namespace)}
     addFloat(prop_name, arr_levels, namespace) {return this.add(prop_name,'float',arr_levels,namespace)}
     addDouble(prop_name, arr_levels, namespace) {return this.add(prop_name,'double',arr_levels,namespace)}
-    addBool(prop_name, arr_levels, namespace) {return this.add(prop_name,'bool',arr_levels,namespace)}
     addDateTime(prop_name, arr_levels, namespace) {return this.add(prop_name,'DateTime',arr_levels,namespace)}
     addTimeSpan(prop_name, arr_levels, namespace) {return this.add(prop_name,'TimeSpan',arr_levels,namespace)}
+    addInt16(prop_name, arr_levels, namespace) {return this.add(prop_name,'Int16',arr_levels,namespace)}
+    addUInt16(prop_name, arr_levels, namespace) {return this.add(prop_name,'UInt16',arr_levels,namespace)}
+    addInt32(prop_name, arr_levels, namespace) {return this.add(prop_name,'Int32',arr_levels,namespace)}
+    addUInt32(prop_name, arr_levels, namespace) {return this.add(prop_name,'UInt32',arr_levels,namespace)}
+    addInt64(prop_name, arr_levels, namespace) {return this.add(prop_name,'Int64',arr_levels,namespace)}
+    addUInt64(prop_name, arr_levels, namespace) {return this.add(prop_name,'UInt64',arr_levels,namespace)}
     /*addAuto(prop) // if props have an initial value, could we automatically determine class names? Could be problematic?
     {
         var class_name = GuessClassName(prop);
@@ -722,38 +728,55 @@ class XmlTemplateFactory
         // Allow each factory to hold its own simple type handlers so they can be customized per factory
         this.SimpleTypeDecoders =
         {
+            'bool': module.exports.DecodeBool,
             'string': module.exports.DecodeString,
-            'long': module.exports.DecodeString,
-            'ulong': module.exports.DecodeString,
-            'byte': module.exports.DecodeInt,
             'sbyte': module.exports.DecodeInt,
-            'int': module.exports.DecodeInt,
-            'uint': module.exports.DecodeInt,
-            'short': module.exports.DecodeInt,
-            'ushort': module.exports.DecodeInt,
+            'byte': module.exports.DecodeInt,
+            'short': module.exports.DecodeInt, 'Int16': module.exports.DecodeInt,
+            'ushort': module.exports.DecodeInt, 'UInt16': module.exports.DecodeInt,
+            'int': module.exports.DecodeInt, 'Int32': module.exports.DecodeInt,
+            'uint': module.exports.DecodeInt, 'UInt32': module.exports.DecodeInt,
+            'long': module.exports.DecodeString, 'Int64': module.exports.DecodeString,
+            'ulong': module.exports.DecodeString, 'UInt64': module.exports.DecodeString,
             'float': module.exports.DecodeFloat,
             'double': module.exports.DecodeDouble,
-            'bool': module.exports.DecodeBool,
             'DateTime': module.exports.DecodeDateTime,
             'TimeSpan': module.exports.DecodeString,
         };
         this.SimpleTypeEncoders =
         {
+            'bool': module.exports.EncodeBool,
             'string': module.exports.EncodeString,
-            'long': module.exports.EncodeString,
-            'ulong': module.exports.EncodeString,
-            'byte': module.exports.EncodePassthrough,
             'sbyte': module.exports.EncodePassthrough,
-            'int': module.exports.EncodePassthrough,
-            'uint': module.exports.EncodePassthrough,
-            'short': module.exports.EncodePassthrough,
-            'ushort': module.exports.EncodePassthrough,
+            'byte': module.exports.EncodePassthrough,
+            'short': module.exports.EncodePassthrough, 'Int16': module.exports.EncodePassthrough,
+            'ushort': module.exports.EncodePassthrough, 'UInt16': module.exports.EncodePassthrough,
+            'int': module.exports.EncodePassthrough, 'Int32': module.exports.EncodePassthrough,
+            'uint': module.exports.EncodePassthrough, 'UInt32': module.exports.EncodePassthrough,
+            'long': module.exports.EncodeString, 'Int64': module.exports.EncodeString,
+            'ulong': module.exports.EncodeString, 'UInt64': module.exports.EncodeString,
             'float': module.exports.EncodePassthrough,
             'double': module.exports.EncodePassthrough,
-            'bool': module.exports.EncodeBool,
             'DateTime': module.exports.EncodeDateTime,
             'TimeSpan': module.exports.EncodeString,
         };
+        /* this.SimpleTypeMeta =
+        {
+            'bool': { BuiltIn: true },
+            'string': { BuiltIn: true },
+            'sbyte': { BuiltIn: true },
+            'byte': { BuiltIn: true },
+            'short': { BuiltIn: true }, 'Int16': { BuiltIn: true },
+            'ushort': { BuiltIn: true }, 'UInt16': { BuiltIn: true },
+            'int': { BuiltIn: true }, 'Int32': { BuiltIn: true },
+            'uint': { BuiltIn: true }, 'UInt32': { BuiltIn: true },
+            'long': { BuiltIn: true }, 'Int64': { BuiltIn: true },
+            'ulong': { BuiltIn: true }, 'UInt64': { BuiltIn: true },
+            'float': { BuiltIn: true },
+            'double': { BuiltIn: true },
+            'DateTime': { BuiltIn: true },
+            'TimeSpan': { BuiltIn: true },
+        }; */
         // Enumerations
         this.Enums = {};
         // Implicit object dictionaries
