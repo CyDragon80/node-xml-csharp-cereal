@@ -7,7 +7,8 @@ const xml = require('../xml-csharp-cereal');
 module.exports.GetFactory = function()
 {
     return (new xml.XmlTemplateFactory(TestClass,AlienSuperHero,SuperHero,Person))
-    .addDict('ArrayOfKeyValueOfstringPerson','KeyValueOfstringPersondRl_SenG_P',['Key','string'],['Value','Person',0,xml.dc_noNS]);
+    .addDict('ArrayOfKeyValueOfstringPerson','KeyValueOfstringPersondRl_SenG_P',['Key','string'],['Value','Person'])
+    .applyDataContractNameSpaces('http://schemas.datacontract.org/2004/07/csharpxml.Test3');
 }
 
 class Person
@@ -22,7 +23,7 @@ class Person
         var temp = new xml.XmlTemplate(this);
         temp.addInt('Age');
         temp.addString('Name');
-        temp.convToDataContract('http://schemas.datacontract.org/2004/07/csharpxml.Test3');
+        temp.setXmlNameSpace('http://schemas.datacontract.org/2004/07/csharpxml.Test3');
         return temp;
     }
 }
@@ -40,7 +41,7 @@ class SuperHero extends Person
         temp.changeClass(this); // reset the copy to this class
         // add the addition props
         temp.addString('SuperName');
-        temp.convToDataContract('http://schemas.datacontract.org/2004/07/csharpxml.Test3');
+        temp.setXmlNameSpace('http://schemas.datacontract.org/2004/07/csharpxml.Test3');
         return temp;
     }
 }
@@ -58,7 +59,7 @@ class AlienSuperHero extends SuperHero
         temp.changeClass(this); // reset the copy to this class
         // add the addition props
         temp.addString('Planet');
-        temp.convToDataContract('http://schemas.datacontract.org/2004/07/csharpxml.Test3');
+        temp.setXmlNameSpace('http://schemas.datacontract.org/2004/07/csharpxml.Test3');
         return temp;
     }
 }
@@ -77,9 +78,9 @@ class TestClass
         var temp = new xml.XmlTemplate(this);
         temp.add('AnotherPerson','Person');
         temp.add('OnePerson','Person');
-        temp.add('PhoneBook','ArrayOfKeyValueOfstringPerson', 0, xml.dc_ArrayNS);
+        temp.add('PhoneBook','ArrayOfKeyValueOfstringPerson');
         temp.add('SomePeople','Person', 1); // array of custom types has no namespace?
-        temp.convToDataContract('http://schemas.datacontract.org/2004/07/csharpxml.Test3');
+        temp.setXmlNameSpace('http://schemas.datacontract.org/2004/07/csharpxml.Test3');
         return temp;
     }
 }

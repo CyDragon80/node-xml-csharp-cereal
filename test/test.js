@@ -28,7 +28,7 @@ for (let i=0; i<XmlLibs.length; ++i)
                     it('should serialize with value set: ' + sub_test_obj.Name, function()
                     {
                         //return RunTest(TestClass0,lib_xml2js,0,0);
-                        return RunTest(cur_class_obj.Module, cur_xml_obj.Module, cur_class_obj.Number, sub_test_obj.Number);
+                        return RunTest(cur_class_obj.Module, cur_xml_obj.Module, cur_class_obj.Number, sub_test_obj.Number, sub_test_obj.Options);
                     });
                 }
             });
@@ -36,18 +36,18 @@ for (let i=0; i<XmlLibs.length; ++i)
     });
 }
 
-function RunTest(test_class,xml_lib,test_number,subtest_number)
+function RunTest(test_class,xml_lib,test_number,subtest_number,opts)
 {
     let test_factory = test_class.GetFactory();
     // first have csharp generate xml
     return csharp.SaveTestXml(test_number,subtest_number,test_xml).then(()=>
     {
         // we read the xml
-        return xml_lib.LoadFromXml(test_factory,test_xml);
+        return xml_lib.LoadFromXml(test_factory,test_xml,opts);
     }).then((obj)=>
     {
         // we write the xml
-        return xml_lib.SaveToXml(obj,test_factory,test_xml);
+        return xml_lib.SaveToXml(obj,test_factory,test_xml,opts);
     }).then(()=>
     {
         // csharp verifies the xml

@@ -28,6 +28,7 @@ DataContractSerializer notes (if we go there)
 -Arrays and dictionaries are tagged xmlns:d2p1="http://schemas.microsoft.com/2003/10/Serialization/Arrays".
 -Jagged Array and dictionary type tags follow different naming convention compared to XmlSerializer.
 -Built-in DateTime and TimeSpan support using ISO strings.
+-Where XmlSerializer requires very manual namespace handling, DataContractSerializer denotes each different namespace as it is used.
 */
 
 /*Example using xml2js objects:   [tested vs xml2js 0.4.19]
@@ -198,11 +199,10 @@ function CheckConvertClassName(class_name)
     return class_name;
 }
 
-// prefix is used for XML generation, during XML reading the uri is searched and its given prefix is used during parsing
-module.exports.dc_ArrayNS = {uri:"http://schemas.microsoft.com/2003/10/Serialization/Arrays",prefix:'d2p1'};
-module.exports.dc_SystemNS = {uri:"http://schemas.datacontract.org/2004/07/System",prefix:'d2p1'};
-module.exports.dc_noNS = {uri:"",prefix:""};
-
+// typical XmlNameSpaces for DataContract
+module.exports.xmlNS_Array = 'http://schemas.microsoft.com/2003/10/Serialization/Arrays';
+module.exports.xmlNS_System = 'http://schemas.datacontract.org/2004/07/System';
+module.exports.xmlNS_None = '';
 // endregion "Helper Functions" -----
 
 
@@ -285,7 +285,7 @@ class KeyValuePairStub
  */
 class DictionaryFactory  // For now maybe we don't expose internal plumbing of generic object dictionary
 {
-    constructor(pair_name, key_prop, value_prop)
+    constructor(pair_name, key_prop, value_prop, namespace)
     {
         if (!module.exports.IsString(pair_name)) throw new Error('DictionaryFactory pair_name must be string');
         if (!(key_prop instanceof module.exports.XmlTemplateItem)) throw new Error('DictionaryFactory key_class must be XmlTemplateItem');
@@ -296,11 +296,12 @@ class DictionaryFactory  // For now maybe we don't expose internal plumbing of g
         this.PairName = pair_name;
         this.KeyProp = key_prop;
         this.ValueProp = value_prop;
+        this.XmlNameSpace = namespace;
     }
     createDictTemplate(class_name)
     {
         var t = new module.exports.XmlTemplate(ArrayStub);
-        var item = t.add('Items', this.PairName, 1);
+        var item = t.add('Items', this.PairName, 1, this.XmlNameSpace);
         item.DictionaryData = this;
         t.XmlPassthrough = 'Items'; // in xml processing, this class is transparent, the value of Items replaces the class itself in XML
         return t;
@@ -341,7 +342,7 @@ module.exports.arrLevels = function arrLevels(levels, class_name, is_DataContrac
  */
 class ArrayFactory
 {
-    constructor(levels, class_name) // levels is either a number of dimensions or an array of string names
+    constructor(levels, class_name, namespace) // levels is either a number of dimensions or an array of string names
     {
         // levels are named from inner dimension to outer dimensions
         if (!Array.isArray(levels)) // if no names given, guess based on observed patterns
@@ -349,10 +350,12 @@ class ArrayFactory
             this.Levels = module.exports.arrLevels(levels, class_name);
         }
         else this.Levels = levels;
+        this.XmlNameSpace = namespace;
     }
     clone(new_base_level)
     {
         var n = new ArrayFactory(this.Levels);
+        n.XmlNameSpace = this.XmlNameSpace;
         if (new_base_level!=undefined) n.Levels[0] = new_base_level;
         return n;
     }
@@ -361,6 +364,8 @@ class ArrayFactory
     nextTemp(cur_prop) // call in decode/encode to handle extra layer
     {
         var nx = new ArrayFactory(this.Levels.slice(0, -1)); // get next level
+        // Don't pass down XmlNameSpace, keep it at top level only ? Doesn't matter?
+        nx.XmlNameSpace = this.XmlNameSpace;
         var p = cur_prop.clone('Items', nx.getTopClass());
         p.ArrayData = nx;
         var t = new module.exports.XmlTemplate(ArrayStub);
@@ -378,9 +383,8 @@ class XmlTemplateItem
      * @param {string} prop_name Property Name
      * @param {string} class_name Class or Type Name
      * @param {number|string[]} [arr_levels=0] Number of dimensions or array of tag names (if not defined, assumes no array)
-     * @param {string} namespace DataContract name space
      */
-    constructor(prop_name, class_name, arr_levels, namespace)
+    constructor(prop_name, class_name, arr_levels, arr_namespace)
     {
         if (!module.exports.IsString(prop_name)) throw new Error('XmlTemplateItem.constructor prop_name must be string');
         if (!module.exports.IsString(class_name)) throw new Error('XmlTemplateItem.constructor class_name must be string');
@@ -389,10 +393,9 @@ class XmlTemplateItem
         this.ClassName = class_name;
         // instance of ArrayFactory
         if (arr_levels instanceof ArrayFactory) this.ArrayData = arr_levels;
-        else if (Array.isArray(arr_levels)) this.ArrayData = new ArrayFactory(arr_levels, this.ClassName);
-        else if (arr_levels > 0) this.ArrayData = new ArrayFactory(module.exports.arrLevels(arr_levels,this.ClassName,(namespace!=null)), this.ClassName);
+        else if (Array.isArray(arr_levels)) this.ArrayData = new ArrayFactory(arr_levels, this.ClassName, arr_namespace);
+        else if (arr_levels > 0) this.ArrayData = new ArrayFactory(module.exports.arrLevels(arr_levels,this.ClassName,(arr_namespace!=undefined)), this.ClassName, arr_namespace);
         else this.ArrayData = null;
-        this.NameSpace = namespace; // DataContract
         this.NullableData = null;
         this.AttrData = null;
         // temp runtime props
@@ -400,13 +403,12 @@ class XmlTemplateItem
         // Add a member for tracking XML element vs attribute?
     }
     //toString() { return this.Name; }
-    clone(prop_name, class_name, arr_levels, namespace)
+    clone(prop_name, class_name, arr_levels)
     {
         if (prop_name==undefined) prop_name = this.Name;
         if (class_name==undefined) class_name = this.ClassName;
-        if (arr_levels==undefined) arr_levels = this.ArrayData;
-        if (namespace==undefined) namespace = this.NameSpace;
-        var n = new module.exports.XmlTemplateItem(prop_name, class_name, arr_levels, namespace);
+        if (arr_levels==undefined) arr_levels = this.ArrayData; // arr_namespace is part of ArrayData
+        var n = new module.exports.XmlTemplateItem(prop_name, class_name, arr_levels);
         n.NullableData = this.NullableData;
         n.AttrData = this.AttrData;
         return n;
@@ -444,6 +446,7 @@ class XmlTemplate
         this.ClassConstructor = parent_class;
         this.ConstructorArgs = constructor_args || null;
         this.Props = []; // array of XmlTemplateItem
+        this.XmlNameSpace = null;
         // temp runtime props
         //this.XmlPassthrough = null; // name of prop that is used as abstract passthrough for XML processing
     }
@@ -495,41 +498,40 @@ class XmlTemplate
      * @param {string|XmlTemplateItem} prop_name Property Name or instance of Property XML template. If passing full item template, other parameters are ignored.
      * @param {string|Function|Object} class_name Class Name or Class instance or Class function of the property.
      * @param {number|string[]} [arr_levels=0] Number of dimensions or array of tag names (if not defined, assumes no array)
-     * @param {?Object} namespace XML Namespace for DataContractSerializer represented as {uri:"",prefix:""}
      * @returns {XmlTemplateItem} instance of the new property XML template that was added
      */
-    add(prop_name, class_name, arr_levels, namespace)
+    add(prop_name, class_name, arr_levels, arr_namespace)
     {
         var obj = prop_name; // allow feeding just a XmlTemplateItem instance
         if (!(obj instanceof module.exports.XmlTemplateItem))
         {
             class_name = CheckConvertClassName(class_name);
-            obj = new module.exports.XmlTemplateItem(prop_name, class_name, arr_levels, namespace);
+            obj = new module.exports.XmlTemplateItem(prop_name, class_name, arr_levels, arr_namespace);
         }
         this.Props.push(obj);
         return obj; // return XmlTemplateItem in case it is useful at some point?
     }
     // common type add helpers
-    addBool(prop_name, arr_levels, namespace) {return this.add(prop_name,'bool',arr_levels,namespace)}
-    addString(prop_name, arr_levels, namespace) {return this.add(prop_name,'string',arr_levels,namespace)}
-    addSByte(prop_name, arr_levels, namespace) {return this.add(prop_name,'sbyte',arr_levels,namespace)}
-    addByte(prop_name, arr_levels, namespace) {return this.add(prop_name,'byte',arr_levels,namespace)}
-    addInt(prop_name, arr_levels, namespace) {return this.add(prop_name,'int',arr_levels,namespace)}
-    addUInt(prop_name, arr_levels, namespace) {return this.add(prop_name,'uint',arr_levels,namespace)}
-    addShort(prop_name, arr_levels, namespace) {return this.add(prop_name,'short',arr_levels,namespace)}
-    addUShort(prop_name, arr_levels, namespace) {return this.add(prop_name,'ushort',arr_levels,namespace)}
-    addLong(prop_name, arr_levels, namespace) {return this.add(prop_name,'long',arr_levels,namespace)}
-    addULong(prop_name, arr_levels, namespace) {return this.add(prop_name,'ulong',arr_levels,namespace)}
-    addFloat(prop_name, arr_levels, namespace) {return this.add(prop_name,'float',arr_levels,namespace)}
-    addDouble(prop_name, arr_levels, namespace) {return this.add(prop_name,'double',arr_levels,namespace)}
-    addDateTime(prop_name, arr_levels, namespace) {return this.add(prop_name,'DateTime',arr_levels,namespace)}
-    addTimeSpan(prop_name, arr_levels, namespace) {return this.add(prop_name,'TimeSpan',arr_levels,namespace)}
-    addInt16(prop_name, arr_levels, namespace) {return this.add(prop_name,'Int16',arr_levels,namespace)}
-    addUInt16(prop_name, arr_levels, namespace) {return this.add(prop_name,'UInt16',arr_levels,namespace)}
-    addInt32(prop_name, arr_levels, namespace) {return this.add(prop_name,'Int32',arr_levels,namespace)}
-    addUInt32(prop_name, arr_levels, namespace) {return this.add(prop_name,'UInt32',arr_levels,namespace)}
-    addInt64(prop_name, arr_levels, namespace) {return this.add(prop_name,'Int64',arr_levels,namespace)}
-    addUInt64(prop_name, arr_levels, namespace) {return this.add(prop_name,'UInt64',arr_levels,namespace)}
+    addBool(prop_name, arr_levels, arr_namespace) {return this.add(prop_name,'bool',arr_levels,arr_namespace)}
+    addString(prop_name, arr_levels, arr_namespace) {return this.add(prop_name,'string',arr_levels,arr_namespace)}
+    addSByte(prop_name, arr_levels, arr_namespace) {return this.add(prop_name,'sbyte',arr_levels,arr_namespace)}
+    addByte(prop_name, arr_levels, arr_namespace) {return this.add(prop_name,'byte',arr_levels,arr_namespace)}
+    addInt(prop_name, arr_levels, arr_namespace) {return this.add(prop_name,'int',arr_levels,arr_namespace)}
+    addUInt(prop_name, arr_levels, arr_namespace) {return this.add(prop_name,'uint',arr_levels,arr_namespace)}
+    addShort(prop_name, arr_levels, arr_namespace) {return this.add(prop_name,'short',arr_levels,arr_namespace)}
+    addUShort(prop_name, arr_levels, arr_namespace) {return this.add(prop_name,'ushort',arr_levels,arr_namespace)}
+    addLong(prop_name, arr_levels, arr_namespace) {return this.add(prop_name,'long',arr_levels,arr_namespace)}
+    addULong(prop_name, arr_levels, arr_namespace) {return this.add(prop_name,'ulong',arr_levels,arr_namespace)}
+    addFloat(prop_name, arr_levels, arr_namespace) {return this.add(prop_name,'float',arr_levels,arr_namespace)}
+    addDouble(prop_name, arr_levels, arr_namespace) {return this.add(prop_name,'double',arr_levels,arr_namespace)}
+    addDateTime(prop_name, arr_levels, arr_namespace) {return this.add(prop_name,'DateTime',arr_levels,arr_namespace)}
+    addTimeSpan(prop_name, arr_levels, arr_namespace) {return this.add(prop_name,'TimeSpan',arr_levels,arr_namespace)}
+    addInt16(prop_name, arr_levels, arr_namespace) {return this.add(prop_name,'Int16',arr_levels,arr_namespace)}
+    addUInt16(prop_name, arr_levels, arr_namespace) {return this.add(prop_name,'UInt16',arr_levels,arr_namespace)}
+    addInt32(prop_name, arr_levels, arr_namespace) {return this.add(prop_name,'Int32',arr_levels,arr_namespace)}
+    addUInt32(prop_name, arr_levels, arr_namespace) {return this.add(prop_name,'UInt32',arr_levels,arr_namespace)}
+    addInt64(prop_name, arr_levels, arr_namespace) {return this.add(prop_name,'Int64',arr_levels,arr_namespace)}
+    addUInt64(prop_name, arr_levels, arr_namespace) {return this.add(prop_name,'UInt64',arr_levels,arr_namespace)}
     /*addAuto(prop) // if props have an initial value, could we automatically determine class names? Could be problematic?
     {
         var class_name = GuessClassName(prop);
@@ -537,18 +539,7 @@ class XmlTemplate
         this.add(prop_name, class_name);
     }*/
     sortByName() {this.Props.sort(function(a,b) { return (a.Name<b.Name ? -1 : (a.Name>b.Name ? 1 : 0)); });}
-    convToDataContract(class_namespace)
-    {
-        // sort Props - THIS could mess up derived classes, make a separate sort for now or look into selectable sorting?
-        //this.Props.sort(function(a,b) { return (a.Name<b.Name ? -1 : (a.Name>b.Name ? 1 : 0)); });
-        // make everything nullable? TODO - perhaps create a separate flag for this?
-        this.Props.forEach(function(item)
-        {
-            item.nullable();
-        });
-        // Add namespace to class
-        this.ClassNameSpace = class_namespace;
-    }
+    setXmlNameSpace(xml_namespace) { this.XmlNameSpace = xml_namespace; }
     // parsing/generating methods for various kinds of XML library objects
     /**
      * Deserializes this class from the given XML node
@@ -585,13 +576,16 @@ class XmlTemplate
                     new_obj[prop.Name] = null;
                     return;
                 }
-                if (prop.NameSpace != null)
+                var ns = factory._findNS(prop, opts, _state);
+                if (ns != null)
                 {
-                    if(prop.NameSpace.uri=='') _state.Prefix = '';
+                    //if(ns=='') _state.Prefix = '';
+                    if (ns=='' || ns == _state.RootNameSpace) _state.Prefix = '';
                     else
                     {
-                        let ns = xml2js_FindNS(xml_node, prop.NameSpace.uri);
-                        if (ns!=null) _state.Prefix = ns + ':';
+                        let pns = xml2js_FindNS(xml_node, ns);
+                        if (pns!=null) _state.Prefix = pns + ':';
+                        //else throw new Error("Cannot find XML namespace " + ns);
                     }
                 }
                 if (prop.ArrayData)   // we expect an array of a single type
@@ -649,15 +643,11 @@ class XmlTemplate
         {
             var prev_prefix = _state.Prefix;
             var new_item;
-            if (prop.NameSpace != null)
-            {
-                if(prop.NameSpace.uri=='') _state.Prefix = '';
-                else _state.Prefix = prop.NameSpace.prefix+':';
-            }
+            var ns = factory._applyNS(prop, opts, _state);
             var cur_data = class_inst[prop.Name];
             if (cur_data==null)
             {
-                if (prop.NullableData) new_obj[prev_prefix+prop.Name] = new_item = { $: { [_state.XmlInstance+':nil']:'true' } };
+                if (prop.NullableData || opts.UseNil) new_obj[prev_prefix+prop.Name] = new_item = { $: { [_state.XmlInstance+':nil']:'true' } };
             }
             else if (prop.ArrayData)
             {
@@ -694,7 +684,7 @@ class XmlTemplate
                 else if (this.XmlPassthrough) new_obj[prop.Name] = new_item;
                 else new_obj[prev_prefix+prop.Name] = new_item;
             }
-            if (_state.Prefix != prev_prefix && prop.NameSpace && prop.NameSpace.uri) xml2js_AddAttrBack(new_item, 'xmlns:'+prop.NameSpace.prefix, prop.NameSpace.uri);
+            if (_state.Prefix != prev_prefix && _state.Prefix && ns) xml2js_AddAttrBack(new_item, 'xmlns:'+_state.Prefix.slice(0,-1), ns);
             _state.Prefix = prev_prefix;
         }, this);
         return (this.XmlPassthrough ? new_obj[this.XmlPassthrough] : new_obj);
@@ -760,6 +750,7 @@ class XmlTemplateFactory
             'DateTime': module.exports.EncodeDateTime,
             'TimeSpan': module.exports.EncodeString,
         };
+        this.SimpleTypeNameSpaces = {}; // defaults are all buit-in and have no namespace
         /* this.SimpleTypeMeta =
         {
             'bool': { BuiltIn: true },
@@ -799,11 +790,12 @@ class XmlTemplateFactory
      * Adds an enum type description
      * @param {string} enum_name Name of the enum
      * @param {Object} enum_obj Simple object representation of the enum, or object providing getEnumValue and getEnumName functions
+     * @param {?string} [enum_namespace=null] Class namespace of the enum
      * @return {XmlTemplateFactory} This factory instance
      */
-    addEnum(enum_name, enum_obj)
+    addEnum(enum_name, enum_obj, enum_namespace)
     {
-        this.Enums[enum_name] = enum_obj;
+        this.Enums[enum_name] = { obj: enum_obj, ns: enum_namespace };
         return this;
     }
     /**
@@ -812,13 +804,14 @@ class XmlTemplateFactory
      * @param {string} pair_name Name of key-value pair
      * @param {XmlTemplateItem|any[]} key_prop Property info for the key (if given array, it is passed to XmlTemplateItem constructor)
      * @param {XmlTemplateItem|any[]} value_prop Property info for the value (if given array, it is passed to XmlTemplateItem constructor)
+     * @param {?string} [dict_namespace=null] Class namespace of the dictionary
      * @return {XmlTemplateFactory} This factory instance
      */
-    addDict(class_name, pair_name, key_prop, value_prop)
+    addDict(class_name, pair_name, key_prop, value_prop, dict_namespace)
     {
         if (Array.isArray(key_prop)) key_prop = new module.exports.XmlTemplateItem(...key_prop);
         if (Array.isArray(value_prop)) value_prop = new module.exports.XmlTemplateItem(...value_prop);
-        var t = new DictionaryFactory(pair_name, key_prop, value_prop);
+        var t = new DictionaryFactory(pair_name, key_prop, value_prop, dict_namespace);
         this.ImplicitDicts[class_name] = t;
         return this;
     }
@@ -826,10 +819,10 @@ class XmlTemplateFactory
      * Adds an implicit dictionary description assuming 'KeyValuePair' with string 'Key'
      * @param {string} class_name Name of dictionary class
      * @param {string|XmlTemplateItem|any[]} value_class Value class name or property info (if given array, it is passed to XmlTemplateItem constructor)
-     * @param {number|string[]} [value_arr_levels=0] Number of dimensions or array of tag names (if not defined, assumes no array)
+     * @param {?string} [dict_namespace=null] Class namespace of the dictionary
      * @return {XmlTemplateFactory} This factory instance
      */
-    addDictQuick(class_name, value_class, value_arr_levels)
+    addDictQuick(class_name, value_class, dict_namespace)
     {
         if (Array.isArray(value_class)) value_class = new module.exports.XmlTemplateItem(...value_class);
         if (value_class instanceof module.exports.XmlTemplateItem) // value_class is full item
@@ -841,10 +834,10 @@ class XmlTemplateFactory
         {
             var alias = module.exports.CsharpTypeAliases[value_class];
             if (alias==undefined) alias = value_class;
-            value_class = new module.exports.XmlTemplateItem('Value', value_class, value_arr_levels);
+            value_class = new module.exports.XmlTemplateItem('Value', value_class);
         }
         if (class_name==undefined) class_name = 'DictionaryOfString' + alias.charAt(0).toUpperCase() + alias.slice(1);
-        return this.addDict(class_name, 'KeyValuePair', ['Key', 'string'], value_class);
+        return this.addDict(class_name, 'KeyValuePair', ['Key', 'string'], value_class, dict_namespace);
     }
     /**
      * Finds a class XML template from the factory's collection.
@@ -905,11 +898,11 @@ class XmlTemplateFactory
         }
         // check for enums
         var enum_obj = this.Enums[prop_info.ClassName];
-        if (enum_obj!=undefined)
+        if (enum_obj!=undefined && enum_obj.obj!=undefined)
         {
             var v = null;
-            if (typeof(enum_obj.getEnumValue)=='function') v = enum_obj.getEnumValue(obj);
-            else v = enum_obj[obj];
+            if (typeof(enum_obj.obj.getEnumValue)=='function') v = enum_obj.obj.getEnumValue(obj);
+            else v = enum_obj.obj[obj];
             // if it's undefind it will be ignored, do we want an error instead?
             if (v==null) throw new Error(prop_info.ClassName + ' does not define "' + obj +'"');
             return v;
@@ -918,8 +911,7 @@ class XmlTemplateFactory
         var func = this.SimpleTypeDecoders[prop_info.ClassName];
         if (func != undefined) return func(obj);
         // check registered class types
-        if (!obj) // TODO - is this really a thing? a string is a simple type?
-            return null; // if obj is XML empty string?
+        if (!obj) return null; // if obj is XML empty string?
         var cn = (mods.DerivedClass ? mods.DerivedClass : prop_info.ClassName);
         var tp = this.find(cn);
         if (tp==null) throw new Error('XmlTemplateFactory cannot find type '+cn);  // return undefined to ignore, null to set obj instance to null, or should we throw error?
@@ -968,15 +960,15 @@ class XmlTemplateFactory
         }
         // check for enum
         var enum_obj = this.Enums[prop_info.ClassName];
-        if (enum_obj!=undefined)
+        if (enum_obj!=undefined&&enum_obj.obj!=undefined)
         {
             var n = null;
-            if (typeof(enum_obj.getEnumName)=='function') n = enum_obj.getEnumName(obj);
+            if (typeof(enum_obj.obj.getEnumName)=='function') n = enum_obj.obj.getEnumName(obj);
             else
             {
-                for (let k in enum_obj) // just enumerable object props?
+                for (let k in enum_obj.obj) // just enumerable object props?
                 {
-                    if (enum_obj[k]==obj) { n = k; break; }
+                    if (enum_obj.obj[k]==obj) { n = k; break; }
                 }
             }
             // if it cannot find enum name, do we error or just use the raw value?
@@ -1005,6 +997,68 @@ class XmlTemplateFactory
         // create temporary prop of derived class name
         return this.find(obj_name);
     }
+    _findNS(prop_info, opts, _state)
+    {
+        if (prop_info.ArrayData && prop_info.ArrayData.XmlNameSpace!=null) return prop_info.ArrayData.XmlNameSpace;
+        var dict_factory = this.ImplicitDicts[prop_info.ClassName];
+        if (dict_factory) return dict_factory.XmlNameSpace;
+        var enum_obj = this.Enums[prop_info.ClassName];
+        if (enum_obj!=undefined) return (enum_obj.ns==null?null:enum_obj.ns);
+        var ns = this.SimpleTypeNameSpaces[prop_info.ClassName];
+        if (ns != undefined) return ns;
+        var tp = this.find(prop_info.ClassName);
+        if (tp!=null) return tp.XmlNameSpace;
+        return null;
+    }
+    _applyNS(prop_info, opts, _state)
+    {
+        var ns = this._findNS(prop_info, opts, _state);
+        if (ns != null)
+        {
+            var prefix = 'd1p1'; // TODO - compute this
+            if(ns=='' || ns == _state.RootNameSpace) _state.Prefix = '';
+            else _state.Prefix = prefix+':';
+        }
+        return ns;
+    }
+    applyDataContractNameSpaces(default_namespace)
+    {
+        // By default, nothing has a namespace.
+        // Calling this will attempt to set namespaces in a fashion for DataContract use.
+        // However custom types still need to be set manually? If unset, use default namespace.
+        // Simple types are assumed built-in and require manual assignment if needed.
+        // If namespace is empty string '', it should be ignored as purposely set to nothing.
+        for (let e in this.Enums)
+        {
+            // Enums assumed to be default_namespace unless already assigned.
+            if (this.Enums[e].ns==null) this.Enums[e].ns = default_namespace;
+        }
+        for (let d in this.ImplicitDicts)
+        {
+            if (this.ImplicitDicts[d].XmlNameSpace==null) this.ImplicitDicts[d].XmlNameSpace = 'http://schemas.microsoft.com/2003/10/Serialization/Arrays';
+        }
+        for (let t in this.XmlTemplates) // get templates first
+        {
+            if (this.XmlTemplates[t].XmlNameSpace==null) this.XmlTemplates[t].XmlNameSpace = default_namespace;
+        }
+        for (let t in this.XmlTemplates) // then go looking for arrays
+        {
+            this.XmlTemplates[t].Props.forEach(function(p)
+            {
+                if (p.ArrayData && p.ArrayData.XmlNameSpace==null)
+                {
+                    if (p.NullableData) p.ArrayData.XmlNameSpace = 'http://schemas.datacontract.org/2004/07/System';
+                    else // if it has its own namespace, use that; otherwise assume built-in and use array name space
+                    {
+                        var ns = this._findNS(p);
+                        if (ns) p.ArrayData.XmlNameSpace = ns;
+                        else p.ArrayData.XmlNameSpace = 'http://schemas.microsoft.com/2003/10/Serialization/Arrays';
+                    }
+                }
+            },this);
+        }
+        return this;
+    }
     /**
      * Creates a new class instance from the given object from xml2js.
      * @param {Object} xml2js_obj Object produced by xml2js from XML.
@@ -1028,6 +1082,7 @@ class XmlTemplateFactory
         // grab any needed namespace info off root element
         var inst_ns = xml2js_FindNS(root_node, 'http://www.w3.org/2001/XMLSchema-instance');
         if (inst_ns) _state.XmlInstance = inst_ns;
+        _state.RootNameSpace = root_temp.XmlNameSpace;
         return root_temp._from_xml2js(this, xml2js_obj[props[0]], options, _state);
     }
     /**
@@ -1050,12 +1105,13 @@ class XmlTemplateFactory
         if (temp==null) throw new Error('XmlTemplateFactory does not contain template for "' + class_name +'"');
         // make root node, which for xml2js is an explicit property (using default settings)
         var xml_obj = {};
-        _state.XmlInstance = (temp.ClassNameSpace ? 'i' : 'xsi'); // we will add the actual namespace at the end
+        _state.XmlInstance = (temp.XmlNameSpace ? 'i' : 'xsi'); // we will add the actual namespace at the end
+        _state.RootNameSpace = temp.XmlNameSpace;
         xml_obj[class_name] = temp._to_xml2js(this, root_obj, options, _state);
         if (typeof(xml_obj[class_name])=='object')
         {
             // add typical namespaces, taking care not to blow away any attributes already there
-            var name_spaces = temp.ClassNameSpace ? { 'xmlns:i':'http://www.w3.org/2001/XMLSchema-instance', 'xmlns':temp.ClassNameSpace } : { 'xmlns:xsd':'http://www.w3.org/2001/XMLSchema', 'xmlns:xsi':'http://www.w3.org/2001/XMLSchema-instance' };
+            var name_spaces = temp.XmlNameSpace ? { 'xmlns:i':'http://www.w3.org/2001/XMLSchema-instance', 'xmlns':temp.XmlNameSpace } : { 'xmlns:xsd':'http://www.w3.org/2001/XMLSchema', 'xmlns:xsi':'http://www.w3.org/2001/XMLSchema-instance' };
             xml_obj[class_name]['$'] = Object.assign(name_spaces, xml_obj[class_name]['$']);
         }
         return xml_obj;

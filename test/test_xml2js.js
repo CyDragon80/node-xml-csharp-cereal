@@ -6,11 +6,12 @@ const fs = require('fs');
 const xml2js = require('xml2js');
 const xml = require('../xml-csharp-cereal');
 
-module.exports.SaveToXml = function(obj, XmlFactory, fname)
+// Builder options for CRLF = {renderOpts:{'pretty': true,'newline': '\r\n'}}
+module.exports.SaveToXml = function(obj, XmlFactory, fname, opts)
 {
     return new Promise((resolve,reject)=>
     {
-        var xml_obj = XmlFactory.to_xml2js(obj);
+        var xml_obj = XmlFactory.to_xml2js(obj, opts);
         var builder = new xml2js.Builder();
         var xml_data = builder.buildObject(xml_obj);
         fs.writeFile(fname, xml_data, function(err)
@@ -21,7 +22,7 @@ module.exports.SaveToXml = function(obj, XmlFactory, fname)
     });
 }
 
-module.exports.LoadFromXml = function(XmlFactory, fname)
+module.exports.LoadFromXml = function(XmlFactory, fname, opts)
 {
     return new Promise((resolve,reject)=>
     {
@@ -37,7 +38,7 @@ module.exports.LoadFromXml = function(XmlFactory, fname)
                     var obj = null;
                     try
                     {
-                        obj = XmlFactory.from_xml2js(xml_obj);
+                        obj = XmlFactory.from_xml2js(xml_obj, opts);
                         resolve(obj);
                     }
                     catch(e) { reject(e); }

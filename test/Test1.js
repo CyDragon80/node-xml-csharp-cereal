@@ -9,10 +9,11 @@ module.exports.GetFactory = function()
     return (new xml.XmlTemplateFactory(TestClass,SubTestClass))
         .addEnum('MyEnum', MyEnumSimple)
         .addDict('ArrayOfKeyValueOfstringint','KeyValueOfstringint',['Key','string'],['Value','int'])
-        .addDict('ArrayOfArrayOfKeyValueOfstringint','KeyValueOfstringArrayOfArrayOfKeyValueOfstringintty7Ep6D1',['Key','string'],['Value','ArrayOfKeyValueOfstringint',1,xml.dc_ArrayNS])
-        .addDict('ArrayOfKeyValueOfstringSubTestClassjHm_ShSx9','KeyValueOfstringSubTestClassjHm_ShSx9',['Key','string'],['Value','SubTestClass',0,xml.dc_noNS])
-        .addDict('ArrayOfKeyValueOfstringArrayOfMyEnumjHm_ShSx9','KeyValueOfstringArrayOfMyEnumjHm_ShSx9', ['Key','string'], ['Value', 'MyEnum', 1, xml.dc_noNS])
-        .addDict('ArrayOfKeyValueOfstringArrayOfKeyValueOfstringintty7Ep6D1','KeyValueOfstringArrayOfKeyValueOfstringintty7Ep6D1',['Key','string'],['Value','ArrayOfKeyValueOfstringint', 0, xml.dc_ArrayNS]);
+        .addDict('ArrayOfArrayOfKeyValueOfstringint','KeyValueOfstringArrayOfArrayOfKeyValueOfstringintty7Ep6D1',['Key','string'],['Value','ArrayOfKeyValueOfstringint',1])
+        .addDict('ArrayOfKeyValueOfstringSubTestClassjHm_ShSx9','KeyValueOfstringSubTestClassjHm_ShSx9',['Key','string'],['Value','SubTestClass'])
+        .addDict('ArrayOfKeyValueOfstringArrayOfMyEnumjHm_ShSx9','KeyValueOfstringArrayOfMyEnumjHm_ShSx9', ['Key','string'], ['Value', 'MyEnum', 1])
+        .addDict('ArrayOfKeyValueOfstringArrayOfKeyValueOfstringintty7Ep6D1','KeyValueOfstringArrayOfKeyValueOfstringintty7Ep6D1',['Key','string'],['Value','ArrayOfKeyValueOfstringint'])
+        .applyDataContractNameSpaces("http://schemas.datacontract.org/2004/07/csharpxml.Test1");
 }
 
 class TestClass
@@ -56,7 +57,7 @@ class TestClass
         var temp = new xml.XmlTemplate(this);
         //temp.addString('SomeAttr').attr();
         temp.add('MyEnumProp', 'MyEnum');
-        temp.add('MyEnumArray', 'MyEnum', 1, xml.dc_noNS);
+        temp.add('MyEnumArray', 'MyEnum', 1);
         temp.addBool('MyBool');
         temp.addByte('MyByte');
         temp.addInt('MyInt');
@@ -64,26 +65,25 @@ class TestClass
         temp.addLong('MyLong');
         temp.addDouble('MyDouble');
         temp.addInt('MyNullInt').nullable();
-        temp.addInt('MyNullIntArr',1, xml.dc_SystemNS).nullable();
-        temp.addInt('MyIntArray',1, xml.dc_ArrayNS);
+        temp.addInt('MyNullIntArr',1).nullable();
+        temp.addInt('MyIntArray',1);
         //temp.addInt('MyJagIntArray', 2); // jagged array has two dimensions
-        temp.addInt('MyJagIntArray', 2, xml.dc_ArrayNS); // enum usually doesn't have namespace
-        temp.addInt('MyJagIntArray2', 3, xml.dc_ArrayNS);
-        temp.add('MyJagEnumArray', 'MyEnum',2,xml.dc_noNS);
-        temp.addString('MyStrList', 1, xml.dc_ArrayNS);
+        temp.addInt('MyJagIntArray', 2, xml.xmlNS_Array); // enum usually doesn't have namespace
+        temp.addInt('MyJagIntArray2', 3, xml.xmlNS_Array);
+        temp.add('MyJagEnumArray', 'MyEnum',2,"http://schemas.datacontract.org/2004/07/csharpxml.Test1");
+        temp.addString('MyStrList', 1);
         temp.add('MySubClass', 'SubTestClass');
-        temp.add('MySubClassArray', 'SubTestClass',1,xml.dc_noNS);
-        temp.add('MyIntDict', 'ArrayOfKeyValueOfstringint',0,xml.dc_ArrayNS);
-        temp.add('MyIntDictArr', 'ArrayOfKeyValueOfstringint',1,xml.dc_ArrayNS);
-        temp.add('MySubClassDict', 'ArrayOfKeyValueOfstringSubTestClassjHm_ShSx9',0,xml.dc_ArrayNS);
+        temp.add('MySubClassArray', 'SubTestClass',1);
+        temp.add('MyIntDict', 'ArrayOfKeyValueOfstringint');
+        temp.add('MyIntDictArr', 'ArrayOfKeyValueOfstringint',1);
+        temp.add('MySubClassDict', 'ArrayOfKeyValueOfstringSubTestClassjHm_ShSx9');
         // complex embedding?
-        temp.add('MyIntDictDict', 'ArrayOfKeyValueOfstringArrayOfKeyValueOfstringintty7Ep6D1',0,xml.dc_ArrayNS);
-        temp.add('MyEnumArrDict', 'ArrayOfKeyValueOfstringArrayOfMyEnumjHm_ShSx9',0,xml.dc_ArrayNS);
-        temp.add('MyIntDictArrDict', 'ArrayOfArrayOfKeyValueOfstringint',0,xml.dc_ArrayNS);
+        temp.add('MyIntDictDict', 'ArrayOfKeyValueOfstringArrayOfKeyValueOfstringintty7Ep6D1');
+        temp.add('MyEnumArrDict', 'ArrayOfKeyValueOfstringArrayOfMyEnumjHm_ShSx9');
+        temp.add('MyIntDictArrDict', 'ArrayOfArrayOfKeyValueOfstringint');
         temp.addDateTime('MyTime');
         temp.addTimeSpan('MySpan');
         temp.sortByName(); // cheat to avoid re-ordering these properly (won't be an option with derived classes)
-        temp.convToDataContract("http://schemas.datacontract.org/2004/07/csharpxml.Test1");
         return temp;
     }
 }
@@ -105,8 +105,6 @@ class SubTestClass
         //temp.addString('SubAttr2').attr();
         temp.addInt('MySubInt');
         temp.addString('MySubStr');
-        //temp.convToDataContract();
-        temp.convToDataContract("http://schemas.datacontract.org/2004/07/csharpxml.Test1");
         return temp;
     }
 }

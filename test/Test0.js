@@ -11,8 +11,8 @@ module.exports.GetFactory = function()
         // is same as .addDictQuick('SerializableDictionaryOfStringInt32','int')
         .addDictQuick('SerializableDictionaryOfStringSerializableDictionaryOfStringInt32','SerializableDictionaryOfStringInt32')
         .addDictQuick('SerializableDictionaryOfStringSubTestClass','SubTestClass')
-        .addDictQuick('SerializableDictionaryOfStringArrayOfMyEnum','MyEnum',1)
-        .addDictQuick('SerializableDictionaryOfStringArrayOfSerializableDictionaryOfStringInt32','SerializableDictionaryOfStringInt32', 1);
+        .addDictQuick('SerializableDictionaryOfStringArrayOfMyEnum',['Value','MyEnum',1])
+        .addDictQuick('SerializableDictionaryOfStringArrayOfSerializableDictionaryOfStringInt32',['Value','SerializableDictionaryOfStringInt32', 1]);
 }
 
 class TestClass

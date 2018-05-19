@@ -3,8 +3,8 @@
 /*
  To add XML library:
  1. Create module file that exports:
- - SaveToXml(obj, XmlFactory, fname)
- - LoadFromXml(XmlFactory, fname) returning resulting object
+ - SaveToXml(obj, XmlFactory, fname, opts)
+ - LoadFromXml(XmlFactory, fname, opts) returning resulting object
  2. Import module file under Sectio 1 below.
  3. Add instance of XmlLibObj to list in Section 2 below.
 */
@@ -33,7 +33,7 @@ const lib_xml2js = require('./test_xml2js');
 
 
 // region Section 2 XML Library object list
-module.exports = 
+module.exports =
 [
     new XmlLibObj("xml2js", lib_xml2js),
 ];

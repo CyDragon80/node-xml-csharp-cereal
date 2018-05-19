@@ -18,18 +18,19 @@ class TestClassObj
         this.Module = mod;
         this.SubTests = (Array.isArray(subtests) ? subtests : []);
     }
-    add(sub_name, sub_num)
+    add(sub_name, sub_num, opts)
     {
-        this.SubTests.push(new SubTestObj(sub_name, sub_num));
+        this.SubTests.push(new SubTestObj(sub_name, sub_num, opts));
         return this;
     }
 }
 class SubTestObj
 {
-    constructor(name, num)
+    constructor(name, num, opts)
     {
         this.Name = name;
         this.Number = num;
+        this.Options = opts;
     }
 }
 // endregion Section 0 - Helper containers
@@ -50,15 +51,15 @@ module.exports =
     .add("Defaults", 0)
     .add("Set 1", 1),
     new TestClassObj("General DataContractSerializer", 1, Test1)
-    .add("Defaults", 0)
-    .add("Set 1", 1),
+    .add("Defaults", 0, {UseNil:true})
+    .add("Set 1", 1, {UseNil:true}),
     new TestClassObj("Derived XmlSerializer", 2, Test2)
     .add("Defaults", 0)
     .add("Normal Set", 1)
     .add("Derived Set", 2),
     new TestClassObj("Derived DataContractSerializer", 3, Test3)
-    .add("Defaults", 0)
-    .add("Normal Set", 1)
-    .add("Derived Set", 2),
+    .add("Defaults", 0, {UseNil:true})
+    .add("Normal Set", 1, {UseNil:true})
+    .add("Derived Set", 2, {UseNil:true}),
 ];
 // endregion Section 2 Test class object list
