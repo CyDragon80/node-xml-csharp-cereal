@@ -1,6 +1,6 @@
 # node-xml-csharp-cereal [![Build Status](https://travis-ci.org/CyDragon80/node-xml-csharp-cereal.svg?branch=master)](https://travis-ci.org/CyDragon80/node-xml-csharp-cereal)
 
-This a module to provide XML object serialization in Nodejs. It is meant to be at least somewhat compatible with XML from/to the C# XmlSerializer (not DataContractSerializer at this time).
+This a module to provide XML object serialization in Nodejs. It is meant to be at least somewhat compatible with XML from/to the C# XmlSerializer (and DataContractSerializer with a little work).
 
 ## Motivation
 
@@ -37,7 +37,8 @@ fs.readFile("/some/path/to/xml", function(err, xml_data)
         if (err) log(err);
         else
         {
-            var my_obj = XmlFactory.from_xml2js(xml_obj); // deserialize my_obj
+            // deserialize my_obj from xml lib object
+            var my_obj = XmlFactory.from_xml2js(xml_obj);
             log(util.inspect(my_obj, false, null));
         }
     });
@@ -104,14 +105,18 @@ Decoder and encoders for some common simple types are stored in XmlTemplateFacto
 ```javascript
 // Defining a simple type called 'hex'
 //  where factory = new XmlTemplateFactory(...)
-factory.SimpleTypeDecoders['hex'] = function(val, err_val)
+factory.SimpleTypeDecoders['hex'] = function(val)
 {
+    // parse hex in XML node to number in object property
     var ret = parseInt(val, 16);
-    return Number.isFinite(ret) ? ret : err_val;
+    if (!Number.isFinite(ret)) throw new Error('Decoder for "hex" cannot parse node into finite number');
+    return ret;
 }
-factory.SimpleTypeEncoders['hex'] = function(val, err_val)
+factory.SimpleTypeEncoders['hex'] = function(val)
 {
-    if (!Number.isFinite(val)) return err_val;
+    // write hex into XML node from object property value
+    val = parseInt(val); // make sure val is actual number
+    if (!Number.isFinite(val)) throw new Error('Encoder for "hex" requires finite number');
     return val.toString(16);
 }
 . . .
@@ -124,21 +129,20 @@ const Long = require("long");
 // Overriding default int64 handlers
 //  where factory = new XmlTemplateFactory(...)
 factory.SimpleTypeDecoders['Int64'] =
-factory.SimpleTypeDecoders['long'] = function(val, err_val)
+factory.SimpleTypeDecoders['long'] = function(val)
 {
     // parse XML value into Long instance
     if (val == null) return null; // handle nullable long
-    try { return Long.fromValue(val, false); }
-    catch { return err_val; }
+    return Long.fromValue(val, false); // let it throw on error
 }
-factory.SimpleTypeEncoders['Int64'] =
-factory.SimpleTypeEncoders['long'] = function(val, err_val)
+factory.SimpleTypeEncoder['Int64'] =
+factory.SimpleTypeEncoders['long'] = function(val)
 {
     // output Long as string for XML node
     if (val == null) return null; // handle nullable long
-    if (!(val instanceof Long)) return err_val;
-    try { return val.toString() }
-    catch { return err_val; }
+    // if not Long instance already, try to parse into a Long
+    val = Long.fromValue(val, false);
+    return val.toString(); // let it throw on error
 }
 ```
 The default DateTime decoder/encoder uses ISO string and javascript Date object. The default TimeSpan uses string, as there is no built-in javascript  equivalent. Both DateTime and TimeSpan decode/encoder can be overriden to use other methods or libraries.
@@ -164,7 +168,7 @@ temp.addInt('MyJagIntArray', 2);
 // int[][] MyJagIntArray using explicit level names
 temp.addInt('MyJagIntArray', ['int','ArrayOfInt']);
 ```
-During testing a strange behavior was observed in C# where defining a int?[] before int[][] would cause the tag names in int[][] to change from "ArrayOfInt" to "ArrayOfInt1". This can be mitigated by either declaring the nullable array last or adding an explicit XmlArrayItem attribute to the subsequent int[][].
+During testing a strange behavior was observed with C# XmlSerializer where defining a int?[] before int[][] would cause the tag names in int[][] to change from "ArrayOfInt" to "ArrayOfInt1". This can be mitigated by either declaring the nullable array last or adding an explicit XmlArrayItem attribute to the subsequent int[][].
 ```csharp
 [XmlArrayItem(ElementName = "ArrayOfInt", IsNullable = false, Type = typeof(int[]))]
 public int[][] MyJagIntArray;
@@ -197,16 +201,16 @@ factory.addEnum('MyEnum', MyEnumSimple);
 ```
 2. Define a simple type decoder and encoder on the factory.
 ```javascript
-factory.SimpleTypeDecoders['MyEnum'] = function(val, err_val)
+factory.SimpleTypeDecoders['MyEnum'] = function(val)
 {
     var lut = { zero:0, one:1, two:2, three:3 }
-    if (lut[val]==undefined) return err_val;
+    if (lut[val]==undefined) throw new Error('MyEnum does not define ' + val);
     return lut[val];
 }
-factory.SimpleTypeEncoders['MyEnum'] = function(val, err_val)
+factory.SimpleTypeEncoders['MyEnum'] = function(val)
 {
     var lut = { 0:'zero', 1:'one', 2:'two', 3:'three' }
-    if (lut[val]==undefined) return err_val;
+    if (lut[val]==undefined) throw new Error('MyEnum does not define ' + val);
     return lut[val];
 }
 ```
