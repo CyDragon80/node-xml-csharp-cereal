@@ -1,8 +1,7 @@
 'use strict'
 const xml = require('../xml-csharp-cereal');
 
-// DataContract names get messy.
-// Some names get little hash suffixes
+// Some derived class stuff for XmlSerializer
 
 module.exports.GetFactory = function()
 {
@@ -17,7 +16,7 @@ class Person
         this.Name = null;   //public string Name;
         this.Age = 0;   //public int Age;
     }
-    static GetXmlTemplate()
+    static getXmlTemplate()
     {
         var temp = new xml.XmlTemplate(this);
         temp.addString('Name');
@@ -33,10 +32,10 @@ class SuperHero extends Person
         super();
         this.SuperName = null; // public string SuperName;
     }
-    static GetXmlTemplate()
+    static getXmlTemplate()
     {
-        var temp = super.GetXmlTemplate(); // get copy of base class template
-        temp.changeClass(this); // reset the copy to this class
+        var temp = super.getXmlTemplate(); // get copy of base class template
+        temp.extend(this); // this template should extend class
         // add the addition props
         temp.addString('SuperName');
         return temp;
@@ -50,10 +49,10 @@ class AlienSuperHero extends SuperHero
         super();
         this.Planet = null; //public string Planet;
     }
-    static GetXmlTemplate()
+    static getXmlTemplate()
     {
-        var temp = super.GetXmlTemplate(); // get copy of base class template
-        temp.changeClass(this); // reset the copy to this class
+        var temp = super.getXmlTemplate(); // get copy of base class template
+        temp.extend(this); // this template should extend class
         // add the addition props
         temp.addString('Planet');
         return temp;
@@ -69,7 +68,7 @@ class TestClass
         this.SomePeople = null; //public Person[] SomePeople;
         this.PhoneBook = null; //public SerializableDictionary<string, Person> PhoneBook;
     }
-    static GetXmlTemplate()
+    static getXmlTemplate()
     {
         var temp = new xml.XmlTemplate(this);
         temp.add('OnePerson','Person');

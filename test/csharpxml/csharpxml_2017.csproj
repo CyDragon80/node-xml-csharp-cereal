@@ -55,6 +55,7 @@
     <Compile Include="Test1.cs" />
     <Compile Include="Test2.cs" />
     <Compile Include="Test3.cs" />
+    <Compile Include="Test4.cs" />
     <Compile Include="XmlObjectParser.cs" />
   </ItemGroup>
   <ItemGroup>

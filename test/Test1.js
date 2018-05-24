@@ -1,12 +1,13 @@
 'use strict'
 const xml = require('../xml-csharp-cereal');
 
-// DataContract names get messy.
-// Some names get little hash suffixes
+// Just a big mash up of stuff for DataContract
+// DataContract names can get messy.
+// Some names get little hash suffixes.
 
 module.exports.GetFactory = function()
 {
-    return (new xml.XmlTemplateFactory(TestClass,SubTestClass))
+    return (new xml.XmlTemplateFactory(TestClass,SubTestClass)).setMode(xml.xmlModes.DataContractSerializer)
         .addEnum('MyEnum', MyEnumSimple)
         .addDict('ArrayOfKeyValueOfstringint','KeyValueOfstringint',['Key','string'],['Value','int'])
         .addDict('ArrayOfArrayOfKeyValueOfstringint','KeyValueOfstringArrayOfArrayOfKeyValueOfstringintty7Ep6D1',['Key','string'],['Value','ArrayOfKeyValueOfstringint',1])
@@ -52,9 +53,10 @@ class TestClass
         this.MyTime = null; // DateTime
         this.MySpan = null; // TimeSpan
     }
-    static GetXmlTemplate()
+    static getXmlTemplate()
     {
         var temp = new xml.XmlTemplate(this);
+        temp.setMode(xml.xmlModes.DataContractSerializer);
         //temp.addString('SomeAttr').attr();
         temp.add('MyEnumProp', 'MyEnum');
         temp.add('MyEnumArray', 'MyEnum', 1);
@@ -68,9 +70,9 @@ class TestClass
         temp.addInt('MyNullIntArr',1).nullable();
         temp.addInt('MyIntArray',1);
         //temp.addInt('MyJagIntArray', 2); // jagged array has two dimensions
-        temp.addInt('MyJagIntArray', 2, xml.xmlNS_Array); // enum usually doesn't have namespace
-        temp.addInt('MyJagIntArray2', 3, xml.xmlNS_Array);
-        temp.add('MyJagEnumArray', 'MyEnum',2,"http://schemas.datacontract.org/2004/07/csharpxml.Test1");
+        temp.addInt('MyJagIntArray', 2); // enum usually doesn't have namespace
+        temp.addInt('MyJagIntArray2', 3);
+        temp.add('MyJagEnumArray', 'MyEnum',2);
         temp.addString('MyStrList', 1);
         temp.add('MySubClass', 'SubTestClass');
         temp.add('MySubClassArray', 'SubTestClass',1);
@@ -98,13 +100,16 @@ class SubTestClass
         this.MySubInt=0; //public int MySubInt;
         this.MySubStr=null; //public string MySubStr;
     }
-    static GetXmlTemplate()
+    static getXmlTemplate()
     {
         var temp = new xml.XmlTemplate(this);
+        temp.setMode(xml.xmlModes.DataContractSerializer);
         //temp.addInt('SubAttr').attr();
         //temp.addString('SubAttr2').attr();
         temp.addInt('MySubInt');
         temp.addString('MySubStr');
+        // be sure to set namespace here, cause we're going to reuse this class in Test3 for namespace testing
+        temp.setXmlNameSpace('http://schemas.datacontract.org/2004/07/csharpxml.Test1');
         return temp;
     }
 }

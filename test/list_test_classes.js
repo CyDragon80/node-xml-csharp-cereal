@@ -41,6 +41,7 @@ const Test0 = require('./Test0');
 const Test1 = require('./Test1');
 const Test2 = require('./Test2');
 const Test3 = require('./Test3');
+const Test4 = require('./Test4');
 // endregion Section 1 - Test class module imports
 
 
@@ -61,5 +62,8 @@ module.exports =
     .add("Defaults", 0, {UseNil:true})
     .add("Normal Set", 1, {UseNil:true})
     .add("Derived Set", 2, {UseNil:true}),
+    new TestClassObj("NameSpaces DataContractSerializer", 4, Test4)
+    .add("Defaults", 0, {UseNil:true})
+    .add("Normal Set", 1, {UseNil:true}),
 ];
 // endregion Section 2 Test class object list

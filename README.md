@@ -59,7 +59,7 @@ fs.writeFile("/some/path/to/xml", xml_data, function(err)
 });
 ```
 ### Setting Up Your Classes
-In order to serialize or deserialize your classes, this library needs a XmlTemplate for each class describing the properties to include. This can be done by defining a static GetXmlTemplate() on the class itself, or via some external means like a separate function.
+In order to serialize or deserialize your classes, this library needs a XmlTemplate for each class describing the properties to include. This can be done by defining a static getXmlTemplate() on the class itself, or via some external means like a separate function.
 ```javascript
 class MyClass1
 {
@@ -69,7 +69,7 @@ class MyClass1
         this.MyNumber = 0; // number
         this.SomeClass = null; // instance of MyClass2
     }
-    static GetXmlTemplate() // you could use built-in template
+    static getXmlTemplate() // you could use built-in template
     {
         var temp = new xml.XmlTemplate(this);
         temp.addString('MyString'); // like a C# string
@@ -93,7 +93,7 @@ function GetMyClass2XmlTemplate()
 ### Setting Up Your XmlTemplateFactory
 An XML file may have various classes and types in it. A XmlTemplateFactory stores everything needed to decode or encode them.
 ```javascript
-// Constructor takes multiple XmlTemplate's and/or classes with GetXmlTemplate()
+// Constructor takes multiple XmlTemplate's and/or classes with getXmlTemplate()
 var factory = new xml.XmlTemplateFactory(MyClass1, GetMyClass2XmlTemplate());
 
 // You can also add templates to an existing instance

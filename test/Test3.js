@@ -1,6 +1,7 @@
 'use strict'
 const xml = require('../xml-csharp-cereal');
 
+// Some derived class stuff for DataContract
 // DataContract names get messy.
 // Some names get little hash suffixes
 
@@ -18,15 +19,17 @@ class Person
         this.Name = null;   //public string Name;
         this.Age = 0;   //public int Age;
     }
-    static GetXmlTemplate()
+    static getXmlTemplate()
     {
         var temp = new xml.XmlTemplate(this);
+        temp.setMode(xml.xmlModes.DataContractSerializer);
         temp.addInt('Age');
         temp.addString('Name');
         temp.setXmlNameSpace('http://schemas.datacontract.org/2004/07/csharpxml.Test3');
         return temp;
     }
 }
+module.exports.Person = Person; // We are going to use this in Test4. Make sure namespace is set!
 
 class SuperHero extends Person
 {
@@ -35,10 +38,10 @@ class SuperHero extends Person
         super();
         this.SuperName = null; // public string SuperName;
     }
-    static GetXmlTemplate()
+    static getXmlTemplate()
     {
-        var temp = super.GetXmlTemplate(); // get copy of base class template
-        temp.changeClass(this); // reset the copy to this class
+        var temp = super.getXmlTemplate(); // get copy of base class template
+        temp.extend(this); // this template should extend class
         // add the addition props
         temp.addString('SuperName');
         temp.setXmlNameSpace('http://schemas.datacontract.org/2004/07/csharpxml.Test3');
@@ -53,10 +56,10 @@ class AlienSuperHero extends SuperHero
         super();
         this.Planet = null; //public string Planet;
     }
-    static GetXmlTemplate()
+    static getXmlTemplate()
     {
-        var temp = super.GetXmlTemplate(); // get copy of base class template
-        temp.changeClass(this); // reset the copy to this class
+        var temp = super.getXmlTemplate(); // get copy of base class template
+        temp.extend(this); // this template should extend class
         // add the addition props
         temp.addString('Planet');
         temp.setXmlNameSpace('http://schemas.datacontract.org/2004/07/csharpxml.Test3');
@@ -73,7 +76,7 @@ class TestClass
         this.SomePeople = null; //public Person[] SomePeople;
         this.PhoneBook = null; //public SerializableDictionary<string, Person> PhoneBook;
     }
-    static GetXmlTemplate()
+    static getXmlTemplate()
     {
         var temp = new xml.XmlTemplate(this);
         temp.add('AnotherPerson','Person');

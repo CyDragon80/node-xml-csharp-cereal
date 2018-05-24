@@ -1,6 +1,8 @@
 'use strict'
 const xml = require('../xml-csharp-cereal');
 
+// Just a big mash up of stuff for XmlSerializer
+
 module.exports.GetFactory = function()
 {
     return (new xml.XmlTemplateFactory(TestClass,SubTestClass))
@@ -53,7 +55,7 @@ class TestClass
         this.MyTime = null; // DateTime
         this.MySpan = null; // TimeSpan
     }
-    static GetXmlTemplate()
+    static getXmlTemplate()
     {
         var temp = new xml.XmlTemplate(this);
         temp.addString('SomeAttr').attr();
@@ -98,7 +100,7 @@ class SubTestClass
         this.MySubInt=0; //public int MySubInt;
         this.MySubStr=null; //public string MySubStr;
     }
-    static GetXmlTemplate()
+    static getXmlTemplate()
     {
         var temp = new xml.XmlTemplate(this);
         temp.addInt('SubAttr').attr();
