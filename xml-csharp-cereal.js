@@ -395,6 +395,8 @@ module.exports.genArrLevels = function genArrLevels(levels, class_name, xml_mode
     }
     return ArrLevels;
 }
+/*
+// TODO - is this a useful helper or just a big mess?
 module.exports.genDictClassNameDc = function genDictClassNameDc(pair_class)
 {
     // KeyValueOf may contain namespace hash suffix, so better ask
@@ -418,7 +420,7 @@ module.exports.genDictClassName = function genDictClassName(key_class, value_cla
         return 'DictionaryOf' + key_class.charAt(0).toUpperCase() + key_class.slice(1)
         + value_class.charAt(0).toUpperCase() + value_class.slice(1);
     }
-}
+} */
 
 /**
  * Internal factory for handling potentially multidimensional arrays
@@ -427,29 +429,26 @@ module.exports.genDictClassName = function genDictClassName(key_class, value_cla
  */
 class ArrayFactory
 {
-    constructor(levels, class_name, namespace) // levels is either a number of dimensions or an array of string names
+    constructor(levels, namespace) // levels is either a number of dimensions or an array of string names
     {
-        this.Levels = module.exports.genArrLevels(levels, class_name);
+        // allow for defered level names, but levels names must be set before being used!
+        if (!Array.isArray(levels) && !Number.isFinite(levels)) throw new Error('Array levels must be string[] or number');
+        this.Levels = levels;
         this.XmlNameSpace = namespace;
     }
-    clone(new_base_level)
+    clone(new_levels, new_namespace)
     {
-        var n = new ArrayFactory(this.Levels);
-        n.XmlNameSpace = this.XmlNameSpace;
-        if (new_base_level!=undefined) n.Levels[0] = new_base_level;
-        return n;
+        if (new_levels==undefined) new_levels = this.Levels;
+        if (new_namespace==undefined) new_namespace = this.XmlNameSpace;
+        return new ArrayFactory(new_levels, new_namespace);
     }
     getTopClass() { return this.Levels[this.Levels.length-1]; }
     isOneDim() { return (this.Levels==null || this.Levels.length==1); }
     nextTemp(cur_prop) // call in decode/encode to handle extra layer
     {
-        var nx = new ArrayFactory(this.Levels.slice(0, -1)); // get next level
-        // Don't pass down XmlNameSpace, keep it at top level only ? Doesn't matter?
-        nx.XmlNameSpace = this.XmlNameSpace;
-        var p = cur_prop.clone('_Items_', nx.getTopClass());
-        p.ArrayData = nx;
+        var nx = new ArrayFactory(this.Levels.slice(0, -1), this.XmlNameSpace); // get next level
         var t = new XmlTemplate(ArrayStub);
-        t.add(p);
+        t.add( cur_prop.clone('_Items_', nx.getTopClass(), nx) );
         t.XmlPassthrough = '_Items_'; // in xml processing, this class is transparent, the value of Items replaces the class itself in XML
         return t;
     }
@@ -462,7 +461,7 @@ class XmlTemplateItem
      * Creates an instance of XmlTemplateItem.
      * @param {string} prop_name Property Name
      * @param {string} class_name Class or Type Name
-     * @param {?string[]} [arr_levels=null] XML tag names for array levels (if not defined, assumes not an array)
+     * @param {?string[]|number} [arr_levels=null] XML tag names for array levels or number of dimensions (if not defined, assumes not an array)
      * @param {?string} [arr_namespace=undefined] XML namespace for array, if any
      * @param {?boolean} [isNullable=null] If simple type should be flagged as nullable
      */
@@ -474,25 +473,35 @@ class XmlTemplateItem
         this.Name = prop_name;
         this.ClassName = class_name;
         // instance of ArrayFactory
-        if (arr_levels instanceof ArrayFactory) this.ArrayData = arr_levels;
-        else if (Array.isArray(arr_levels)) this.ArrayData = new ArrayFactory(arr_levels, this.ClassName, arr_namespace);
-        else if (!arr_levels) this.ArrayData = null;
-        else throw new Error('XmlTemplateItem arr_levels must be array of strings or null'); // We no longer take number as the names depend on the mode. Caller should use genArrLevels() instead.
+        if (!arr_levels) this.ArrayData = null;
+        else if (arr_levels instanceof ArrayFactory) this.ArrayData = arr_levels;
+        else this.ArrayData = new ArrayFactory(arr_levels, arr_namespace);
         this.NullableData = (isNullable ? {} : null);
         this.AttrData = null;
         // temp runtime props
         //this.DictionaryData = null; // can hold a DictionaryFactory in a KeyValuePair during XML processing
         // Add a member for tracking XML element vs attribute?
     }
-    //toString() { return this.Name; }
+    _checkArray(opts)
+    {
+        // if Array Levels already set, nothing to do
+        if (Array.isArray(this.ArrayData.Levels)) return this;
+        // else we need to generate a copy with auto generated array names
+        var n = this.clone();
+        n.ArrayData.Levels = module.exports.genArrLevels(this.ArrayData.Levels, this.ClassName, opts.XmlMode);
+        return n;
+    }
     clone(prop_name, class_name, arr_levels)
     {
         if (prop_name==undefined) prop_name = this.Name;
         if (class_name==undefined) class_name = this.ClassName;
-        if (arr_levels==undefined) arr_levels = this.ArrayData; // arr_namespace is part of ArrayData
+        // arr_namespace is part of ArrayData
+        if (arr_levels==undefined) arr_levels = this.ArrayData.clone(); // no override, create deep copy
+        else if (Array.isArray(arr_levels)) arr_levels = this.ArrayData.clone(arr_levels); // create copy with new levels
         var n = new XmlTemplateItem(prop_name, class_name, arr_levels);
         n.NullableData = this.NullableData;
         n.AttrData = this.AttrData;
+        n.DictionaryData = this.DictionaryData; // some temporary props carry dict data
         return n;
     }
     nullable()
@@ -527,7 +536,6 @@ class XmlTemplate
         this.extend(class_constructor, constructor_args, class_name);
         this.Props = []; // array of XmlTemplateItem
         this.XmlNameSpace = null;
-        this.XmlMode = module.exports.xmlModes.XmlSerializer;
         // temp runtime props
         //this.XmlPassthrough = null; // name of prop that is used as abstract passthrough for XML processing
     }
@@ -589,11 +597,6 @@ class XmlTemplate
         if (Array.isArray(this.ConstructorArgs)) return new this.ClassConstructor(...this.ConstructorArgs);
         return new this.ClassConstructor();
     }
-    setMode(xml_mode)
-    {
-        this.XmlMode = xml_mode;
-        return this;
-    }
     /**
      * Add property to this class XML template.
      * @param {string|XmlTemplateItem} prop_name Property Name or instance of Property XML template. If passing full item template, other parameters are ignored.
@@ -608,9 +611,8 @@ class XmlTemplate
         var obj = prop_name; // allow feeding just a XmlTemplateItem instance
         if (!(obj instanceof XmlTemplateItem))
         {
-            var ArrLevels = module.exports.genArrLevels(arr_levels, class_name, this.XmlMode);
             class_name = CheckConvertClassName(class_name);
-            obj = new XmlTemplateItem(prop_name, class_name, ArrLevels, arr_namespace, isNullable);
+            obj = new XmlTemplateItem(prop_name, class_name, arr_levels, arr_namespace, isNullable);
         }
         this.Props.push(obj);
         return obj; // return XmlTemplateItem in case it is useful at some point?
@@ -697,6 +699,7 @@ class XmlTemplate
                     }
                     if (prop.ArrayData)   // we expect an array of a single type
                     {
+                        prop = prop._checkArray(opts);
                         // xml2js will turn our type tags into a property containing the sub nodes as another array.
                         // At this point we have {type:[value,...]}
                         //var node_arr = xml_node[_state.Prefix+prop.ClassName];
@@ -770,6 +773,7 @@ class XmlTemplate
                 }
                 else if (prop.ArrayData)
                 {
+                    prop = prop._checkArray(opts);
                     if (!Array.isArray(cur_data)) cur_data = [cur_data];
                     // xml2js needs typed arrays presented to it as {type:[value,...]}
                     var arr = [];
@@ -835,7 +839,6 @@ class XmlTemplateFactory
     constructor(...templates)
     {
         this.XmlTemplates = {}; // use object instead of array so we can use class names as unique keys
-        this.XmlMode = module.exports.xmlModes.XmlSerializer;
         this.Enums = {}; // Enumerations
         this.ImplicitDicts = {}; // Implicit object dictionaries
         this.ClassNameAlias = {}; // Class name aliases
@@ -905,11 +908,6 @@ class XmlTemplateFactory
             'TimeSpan': { BuiltIn: true },
         }; */
     }
-    setMode(xml_mode)
-    {
-        this.XmlMode = xml_mode;
-        return this;
-    }
     /**
      * Add a class XML template to the factory.
      * @param {Function|XmlTemplate} xml_template Class function (with static getXmlTemplate) or XmlTemplate instance.
@@ -949,16 +947,8 @@ class XmlTemplateFactory
     {
         if (!module.exports.IsString(class_name)) throw new Error('XmlTemplateFactory.addDict class_name must be string');
         // XmlTemplateItem(prop_name, class_name, arr_levels, arr_namespace)
-        if (Array.isArray(key_prop))
-        {
-            key_prop[2] = module.exports.genArrLevels(key_prop[2], key_prop[1], this.XmlMode);
-            key_prop = new XmlTemplateItem(...key_prop);
-        }
-        if (Array.isArray(value_prop))
-        {
-            value_prop[2] = module.exports.genArrLevels(value_prop[2], value_prop[1], this.XmlMode);
-            value_prop = new XmlTemplateItem(...value_prop);
-        }
+        if (Array.isArray(key_prop)) key_prop = new XmlTemplateItem(...key_prop);
+        if (Array.isArray(value_prop)) value_prop = new XmlTemplateItem(...value_prop);
         var t = new DictionaryFactory(pair_name, key_prop, value_prop, dict_namespace);
         this.ImplicitDicts[class_name] = t;
         return this;
@@ -974,7 +964,6 @@ class XmlTemplateFactory
     {
         if (Array.isArray(value_prop))
         {
-            value_prop[2] = module.exports.genArrLevels(value_prop[2], value_prop[1], this.XmlMode);
             value_prop = new XmlTemplateItem(...value_prop);
         }
         if (value_prop instanceof XmlTemplateItem) // value_prop is full item
@@ -987,7 +976,7 @@ class XmlTemplateFactory
             value_prop = new XmlTemplateItem('Value', value_prop);
         }
         else throw new Error('addDictQuick value_prop must be string, XmlTemplateItem, or array of XmlTemplateItem constructor arguments');
-        if (class_name==null) class_name = module.exports.genDictClassName('string', value_class, this.XmlMode);
+        //if (class_name==null) class_name = module.exports.genDictClassName('string', value_class, this.XmlMode);
         return this.addDict(class_name, 'KeyValuePair', ['Key', 'string'], value_prop, dict_namespace);
     }
     /**
@@ -1225,7 +1214,7 @@ class XmlTemplateFactory
     from_xml2js(xml2js_obj, options) // create object instance from xml2js object
     {
         // set up any options or initial internal state values
-        options = Object.assign({}, options);
+        options = new XmlProcOptions(options);
         var _state = new XmlProcState();
         // get root node
         var props = Object.getOwnPropertyNames(xml2js_obj);
@@ -1251,7 +1240,7 @@ class XmlTemplateFactory
     to_xml2js(root_obj, options) // create xml2js object from the given object instance
     {
         // set up any options or initial internal state values
-        options = Object.assign({}, options);
+        options = new XmlProcOptions(options);
         var _state = new XmlProcState();
         // find the root object in the xml factory
         var class_name;
@@ -1277,7 +1266,24 @@ class XmlTemplateFactory
 module.exports.XmlTemplateFactory = XmlTemplateFactory;
 
 /**
+ * A little wrapper for internal handling of user options
+ * @private
+ */
+class XmlProcOptions
+{
+    constructor(user_opts)
+    {
+        Object.assign(this, user_opts);
+        // if user did not state a UseNil preference and we are doing DataContract, flip UseNil true
+        if (this.UseNil == undefined && this.isDC()) this.UseNil = true;
+    }
+    isDC() { return (this.XmlMode==module.exports.xmlModes.DataContractSerializer); }
+    setDC() { this.XmlMode=module.exports.xmlModes.DataContractSerializer; }
+}
+
+/**
  * Provide a base level of state tracking info. Various XML libs might dynamically tack on various props, but these are the common core.
+ * @private
  */
 class XmlProcState
 {

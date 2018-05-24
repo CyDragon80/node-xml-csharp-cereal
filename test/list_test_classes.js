@@ -1,4 +1,5 @@
 'use strict'
+const xml = require('../xml-csharp-cereal');
 
 /*
  To add test class and/or value set:
@@ -52,18 +53,18 @@ module.exports =
     .add("Defaults", 0)
     .add("Set 1", 1),
     new TestClassObj("General DataContractSerializer", 1, Test1)
-    .add("Defaults", 0, {UseNil:true})
-    .add("Set 1", 1, {UseNil:true}),
+    .add("Defaults", 0, {XmlMode:xml.xmlModes.DataContractSerializer})
+    .add("Set 1", 1, {XmlMode:xml.xmlModes.DataContractSerializer}),
     new TestClassObj("Derived XmlSerializer", 2, Test2)
     .add("Defaults", 0)
     .add("Normal Set", 1)
     .add("Derived Set", 2),
     new TestClassObj("Derived DataContractSerializer", 3, Test3)
-    .add("Defaults", 0, {UseNil:true})
-    .add("Normal Set", 1, {UseNil:true})
-    .add("Derived Set", 2, {UseNil:true}),
+    .add("Defaults", 0, {XmlMode:xml.xmlModes.DataContractSerializer})
+    .add("Normal Set", 1, {XmlMode:xml.xmlModes.DataContractSerializer})
+    .add("Derived Set", 2, {XmlMode:xml.xmlModes.DataContractSerializer}),
     new TestClassObj("NameSpaces DataContractSerializer", 4, Test4)
-    .add("Defaults", 0, {UseNil:true})
-    .add("Normal Set", 1, {UseNil:true}),
+    .add("Defaults", 0, {XmlMode:xml.xmlModes.DataContractSerializer})
+    .add("Normal Set", 1, {XmlMode:xml.xmlModes.DataContractSerializer}),
 ];
 // endregion Section 2 Test class object list

@@ -23,7 +23,6 @@ class Person
     static getXmlTemplate()
     {
         var temp = new xml.XmlTemplate(this, null, 'Test4.Person'); // specify an override class name that is qualified in some way
-        temp.setMode(xml.xmlModes.DataContractSerializer);
         temp.addInt('Age');
         temp.addString('Name');
         temp.setXmlNameSpace('http://schemas.datacontract.org/2004/07/csharpxml.Test4');
@@ -37,7 +36,6 @@ class ClassOfDifferentName  // test using different name from actual JS class
     static getXmlTemplate()
     {
         var temp = new xml.XmlTemplate(this, null, 'SubTestClass');
-        temp.setMode(xml.xmlModes.DataContractSerializer);
         temp.addString('MyString');
         temp.setXmlNameSpace('http://schemas.datacontract.org/2004/07/csharpxml.Test4');
         return temp;
@@ -60,7 +58,6 @@ class TestClass
     static getXmlTemplate()
     {
         var temp = new xml.XmlTemplate(this);
-        temp.setMode(xml.xmlModes.DataContractSerializer);
         temp.add('AnotherPerson','Person');
         temp.add('JaggedPeople', 'Test4.Person', 2);
         temp.add('OnePerson','Person');

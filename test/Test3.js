@@ -7,7 +7,7 @@ const xml = require('../xml-csharp-cereal');
 
 module.exports.GetFactory = function()
 {
-    return (new xml.XmlTemplateFactory(TestClass,AlienSuperHero,SuperHero,Person))
+    return (new xml.XmlTemplateFactory(TestClass, AlienSuperHero, SuperHero, Person))
     .addDict('ArrayOfKeyValueOfstringPerson','KeyValueOfstringPersondRl_SenG_P',['Key','string'],['Value','Person'])
     .applyDataContractNameSpaces('http://schemas.datacontract.org/2004/07/csharpxml.Test3');
 }
@@ -22,7 +22,6 @@ class Person
     static getXmlTemplate()
     {
         var temp = new xml.XmlTemplate(this);
-        temp.setMode(xml.xmlModes.DataContractSerializer);
         temp.addInt('Age');
         temp.addString('Name');
         temp.setXmlNameSpace('http://schemas.datacontract.org/2004/07/csharpxml.Test3');

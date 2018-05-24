@@ -5,7 +5,7 @@ const xml = require('../xml-csharp-cereal');
 
 module.exports.GetFactory = function()
 {
-    return (new xml.XmlTemplateFactory(TestClass,SubTestClass))
+    return (new xml.XmlTemplateFactory(TestClass, SubTestClass))
         //.addEnum('MyEnum', MyEnumSimple)
         .addEnum('MyEnum', MyEnumExplicit)
         //.addDict('SerializableDictionaryOfStringInt32','KeyValuePair', new xml.XmlTemplateItem('Key','string'),new xml.XmlTemplateItem('Value','int'))

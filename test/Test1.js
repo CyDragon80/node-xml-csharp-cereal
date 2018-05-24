@@ -7,7 +7,7 @@ const xml = require('../xml-csharp-cereal');
 
 module.exports.GetFactory = function()
 {
-    return (new xml.XmlTemplateFactory(TestClass,SubTestClass)).setMode(xml.xmlModes.DataContractSerializer)
+    return (new xml.XmlTemplateFactory(TestClass, SubTestClass))
         .addEnum('MyEnum', MyEnumSimple)
         .addDict('ArrayOfKeyValueOfstringint','KeyValueOfstringint',['Key','string'],['Value','int'])
         .addDict('ArrayOfArrayOfKeyValueOfstringint','KeyValueOfstringArrayOfArrayOfKeyValueOfstringintty7Ep6D1',['Key','string'],['Value','ArrayOfKeyValueOfstringint',1])
@@ -56,7 +56,6 @@ class TestClass
     static getXmlTemplate()
     {
         var temp = new xml.XmlTemplate(this);
-        temp.setMode(xml.xmlModes.DataContractSerializer);
         //temp.addString('SomeAttr').attr();
         temp.add('MyEnumProp', 'MyEnum');
         temp.add('MyEnumArray', 'MyEnum', 1);
@@ -103,7 +102,6 @@ class SubTestClass
     static getXmlTemplate()
     {
         var temp = new xml.XmlTemplate(this);
-        temp.setMode(xml.xmlModes.DataContractSerializer);
         //temp.addInt('SubAttr').attr();
         //temp.addString('SubAttr2').attr();
         temp.addInt('MySubInt');

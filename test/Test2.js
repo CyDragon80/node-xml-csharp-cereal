@@ -5,7 +5,7 @@ const xml = require('../xml-csharp-cereal');
 
 module.exports.GetFactory = function()
 {
-    return (new xml.XmlTemplateFactory(TestClass,AlienSuperHero,SuperHero,Person))
+    return (new xml.XmlTemplateFactory(TestClass, AlienSuperHero, SuperHero, Person))
     .addDictQuick('SerializableDictionaryOfStringPerson','Person');
 }
 
