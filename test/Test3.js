@@ -28,7 +28,6 @@ class Person
         return temp;
     }
 }
-module.exports.Person = Person; // We are going to use this in Test4. Make sure namespace is set!
 
 class SuperHero extends Person
 {

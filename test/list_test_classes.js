@@ -65,6 +65,7 @@ module.exports =
     .add("Derived Set", 2, {XmlMode:xml.xmlModes.DataContractSerializer}),
     new TestClassObj("NameSpaces DataContractSerializer", 4, Test4)
     .add("Defaults", 0, {XmlMode:xml.xmlModes.DataContractSerializer})
-    .add("Normal Set", 1, {XmlMode:xml.xmlModes.DataContractSerializer}),
+    .add("Normal Set", 1, {XmlMode:xml.xmlModes.DataContractSerializer})
+    .add("Derived Set", 2, {XmlMode:xml.xmlModes.DataContractSerializer}),
 ];
 // endregion Section 2 Test class object list

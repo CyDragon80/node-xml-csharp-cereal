@@ -98,7 +98,7 @@ function PathArrToStr(arr)
     if (arr==null) return '?';
     // TODO - should manually build this string and put numbers in square brackets?
     // TODO - instead of array of strings, would array of XmlTemplateItems be better? for XmlPassthrough just have string or null prop name?
-    return arr.join('.');
+    return arr.join('/');
 }
 
 
@@ -374,6 +374,7 @@ class DictionaryFactory  // For now maybe we don't expose internal plumbing of g
 
 function getShortClass(class_name)
 {
+    if (class_name==null) return null;
     var fields = class_name.split('.'); // remove any extra namespace qualifiers
     return fields[fields.length-1];
 }
@@ -383,7 +384,7 @@ module.exports.genArrLevels = function genArrLevels(levels, class_name, xml_mode
     if (Array.isArray(levels)) return levels; // already an array of levels
     if (!Number.isFinite(levels)) throw new Error('Array levels must be array of names of number of dimensions');
     if (levels < 1) return null; // zero-dimensions is effectively no array
-    class_name = getShortClass(class_name);
+    class_name = getShortClass(class_name); // drop any qualifier for use as tag name
     var ArrLevels = [];
     var str = (xml_mode==module.exports.xmlModes.DataContractSerializer ? class_name : class_name.charAt(0).toUpperCase() + class_name.slice(1));
     // levels are named from inner dimension to outer dimensions
@@ -431,7 +432,7 @@ class ArrayFactory
 {
     constructor(levels, namespace) // levels is either a number of dimensions or an array of string names
     {
-        // allow for defered level names, but levels names must be set before being used!
+        // allow user to defer on level names, but level names must be known during use!
         if (!Array.isArray(levels) && !Number.isFinite(levels)) throw new Error('Array levels must be string[] or number');
         this.Levels = levels;
         this.XmlNameSpace = namespace;
@@ -442,13 +443,13 @@ class ArrayFactory
         if (new_namespace==undefined) new_namespace = this.XmlNameSpace;
         return new ArrayFactory(new_levels, new_namespace);
     }
-    getTopClass() { return this.Levels[this.Levels.length-1]; }
+    getTopTag() { return this.Levels[this.Levels.length-1]; }
     isOneDim() { return (this.Levels==null || this.Levels.length==1); }
     nextTemp(cur_prop) // call in decode/encode to handle extra layer
     {
         var nx = new ArrayFactory(this.Levels.slice(0, -1), this.XmlNameSpace); // get next level
         var t = new XmlTemplate(ArrayStub);
-        t.add( cur_prop.clone('_Items_', nx.getTopClass(), nx) );
+        t.add( cur_prop.clone('_Items_', cur_prop.ClassName, nx) );
         t.XmlPassthrough = '_Items_'; // in xml processing, this class is transparent, the value of Items replaces the class itself in XML
         return t;
     }
@@ -555,6 +556,7 @@ class XmlTemplate
      * @param {Function} class_constructor Class function (essentially the constructor)
      * @param {?any[]} [constructor_args=null] Arguments to feed constructor when creating a new instance
      * @param {?string} [class_name] An alternative class name to use in place of the constructor's name
+     * @return {XmlTemplate} The current template (not a copy)
      */
     extend(class_constructor, constructor_args, class_name)
     {
@@ -563,7 +565,11 @@ class XmlTemplate
         // mark any existing Props as inherited? might be useful later?
         if (this.ClassName && Array.isArray(this.Props))
         {
-            this.Props.forEach(function(item){ item.BaseClass = this.ClassName; }.bind(this));
+            this.Props.forEach(function(item)
+            {
+                if (Array.isArray(item.BaseClass)) item.BaseClass.push(this.ClassName); // just keep track of last, or track the whole stack up?
+                else item.BaseClass = [this.ClassName];
+            }.bind(this));
         }
         this.ClassConstructor = class_constructor;
         this.ConstructorArgs = constructor_args || null;
@@ -644,7 +650,18 @@ class XmlTemplate
         var prop_name = ; // need to either determine original name or pass separately?
         this.add(prop_name, class_name);
     }*/
-    sortByName() {this.Props.sort(function(a,b) { return (a.Name<b.Name ? -1 : (a.Name>b.Name ? 1 : 0)); });}
+    sortByName(skip_inherited)
+    {
+        if (skip_inherited)
+        {
+            var inherited = [];
+            var other = [];
+            this.Props.forEach(function(item){ if (item.BaseClass) inherited.push(item); else other.push(item); });
+            other.sort(function(a,b) { return (a.Name<b.Name ? -1 : (a.Name>b.Name ? 1 : 0)); });
+            this.Props = inherited.concat(other);
+        }
+        else this.Props.sort(function(a,b) { return (a.Name<b.Name ? -1 : (a.Name>b.Name ? 1 : 0)); });
+    }
     setXmlNameSpace(xml_namespace) { this.XmlNameSpace = xml_namespace; }
     // parsing/generating methods for various kinds of XML library objects
     /**
@@ -667,7 +684,7 @@ class XmlTemplate
                 _state.ObjPath.push((this.XmlPassthrough==prop.Name ? prop.ClassName : prop.Name));
                 var xml_node;
                 if (this.XmlPassthrough) xml_node = xml2js_obj;
-                else if (prop.AttrData) xml_node = (xml2js_obj.$ ? xml2js_obj.$[prop.Name] : undefined);
+                else if (prop.AttrData) xml_node = xml2js_GetAttr(xml2js_obj, prop.Name);
                 else xml_node = xml2js_obj[_state.Prefix+prop.Name];
                 if (xml_node!=undefined) // XML has this class property
                 {
@@ -702,8 +719,7 @@ class XmlTemplate
                         prop = prop._checkArray(opts);
                         // xml2js will turn our type tags into a property containing the sub nodes as another array.
                         // At this point we have {type:[value,...]}
-                        //var node_arr = xml_node[_state.Prefix+prop.ClassName];
-                        var node_arr = xml_node[_state.Prefix+prop.ArrayData.getTopClass()];
+                        var node_arr = xml_node[_state.Prefix+prop.ArrayData.getTopTag()];
                         if (node_arr==undefined)
                         {
                             if (this.XmlPassthrough==prop.Name) new_obj[prop.Name] = null;
@@ -769,7 +785,7 @@ class XmlTemplate
                 var cur_data = class_inst[prop.Name];
                 if (cur_data==null)
                 {
-                    if (prop.NullableData || opts.UseNil) new_obj[prevNS.Prefix+prop.Name] = new_item = { $: { [_state.XmlInstance+':nil']:'true' } };
+                    if (prop.NullableData || opts.UseNil) new_obj[prevNS.Prefix+prop.Name] = new_item = xml2js_AddAttr(new_item, _state.XmlInstance+':nil', 'true');
                 }
                 else if (prop.ArrayData)
                 {
@@ -781,7 +797,7 @@ class XmlTemplate
                     {
                         _state.ObjPath.push(index);
                         var arr_item;
-                        if (item==null) arr_item = { $: { [_state.XmlInstance+':nil']:'true' } }; // null array items must be listed
+                        if (item==null) arr_item = xml2js_AddAttr(arr_item, _state.XmlInstance+':nil', 'true'); // null array items must be listed
                         else
                         {
                             var mods = {};
@@ -793,7 +809,7 @@ class XmlTemplate
                         _state.ObjPath.pop();
                     },this);
                     var wrap = {};
-                    wrap[_state.Prefix+prop.ArrayData.getTopClass()] = arr;
+                    wrap[_state.Prefix+prop.ArrayData.getTopTag()] = arr;
                     new_item = wrap;
                     if (this.XmlPassthrough) new_obj[prop.Name] = new_item;
                     else new_obj[prevNS.Prefix+prop.Name] = new_item;
@@ -812,7 +828,7 @@ class XmlTemplate
                 if (!_state.compNsState(prevNS) && _state.Prefix && ns)
                 {
                     --_state.PrefixCount;
-                    xml2js_AddAttrBack(new_item, 'xmlns:'+_state.Prefix.slice(0,-1), ns);
+                    xml2js_AddAttrFront(new_item, 'xmlns:'+_state.Prefix.slice(0,-1), ns);
                 }
                 _state.loadNsState(prevNS);
             }
@@ -919,7 +935,7 @@ class XmlTemplateFactory
         // Make sure we have a XmlTemplate instance at this point
         if (!(xml_template instanceof XmlTemplate)) throw new Error('XmlTemplateFactory.add only takes instances of XmlTemplate OR class functions with static getXmlTemplate()');
         this.XmlTemplates[xml_template.getName(true)] = xml_template;
-        if (xml_template.hasAlias()) this.ClassNameAlias[xml_template.ClassConstructor.name] = xml_template.getName();
+        if (xml_template.hasAlias()) this.ClassNameAlias[xml_template.ClassConstructor.name] = xml_template.getName(true);
         return this;
     }
     /**
@@ -1131,7 +1147,7 @@ class XmlTemplateFactory
     {
         if (tp==null) return null; // don't have base, so bail
         if (!module.exports.IsClassInstance(obj)) return tp; // not a class, no change
-        var obj_name = this.ClassNameAlias[obj.constructor.name] || obj.constructor.name; // get class name of the current data instance
+        var obj_name = getShortClass(this.ClassNameAlias[obj.constructor.name]) || obj.constructor.name; // get class name of the current data instance
         if (obj_name == tp.getName()) return tp; // data is the expected class, no change
         // safety check - make sure the class derives from the prop's class?
         if (!(Object.getPrototypeOf(obj) instanceof tp.ClassConstructor)) throw new Error("Not derived class: Data is " + obj_name + ", but property is " + tp.getName());
@@ -1328,14 +1344,15 @@ function xml2js_GetAttr(node, n)
 }
 function xml2js_AddAttr(node, n, v)
 {
-    if (node)
-    {
-        if (node.$) node.$[n] = v;
-        else node.$ = { [n]:v };
-    }
+    if (!node) node = {};
+    if (node.$) node.$[n] = v;
+    else node.$ = { [n]:v };
+    return node;
 }
-function xml2js_AddAttrBack(node, n, v)
+function xml2js_AddAttrFront(node, n, v)
 {
-    if (node) node.$ = Object.assign({ [n]:v }, node.$);
+    if (!node) node = {};
+    node.$ = Object.assign({ [n]:v }, node.$);
+    return node;
 }
 // endregion "xml2js helpers"
