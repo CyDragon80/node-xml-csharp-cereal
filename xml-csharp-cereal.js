@@ -6,6 +6,7 @@
 
 // Put a copy of package.json version here in case module is used by itself.
 module.exports.getVersion = function getVersion() { return '0.0.0'; }
+module.exports.getName = function getName() { return 'xml-csharp-cereal'; }
 
 /* xml-csharp-cereal.js
 This module is to aid in the serializing of XML to and from classes in a fashion similar to C#.
@@ -14,12 +15,6 @@ It is assumed all arrays have elements of the same type, or base type.
 During parsing from XML, class constructors are called without arguments (unless a default set is stored in its template).
 */
 
-/* TODO -
--try to make DataContract setup easier?
--simple type encoders/decoders should be in object in case we want to add more info to simple types? or separate meta objects?
--rework error reporting for simpletypes? decode(val, prop_info, _state) ? prop_info.errDec(msg) ? decode(val, some_class_for_errs)?
--carry a path in _state?
- */
 /*
 DataContractSerializer notes (if we go there)
 -Root tag notes full class namespace xmlns="http://schemas.datacontract.org/2004/07/csharpxml.Test1".
@@ -67,10 +62,12 @@ class XmlSerializerError extends Error
 {
     constructor(opts = null, _state = null, msg)
     {
+        if (_state==null) _state={};
         // In order to get object path into stack output, we need to add it to the message.
         // Error.stack is a getter, so we can change the message even though the stack has been established.
         // (One could override the getter, if one wanted to go that far https://stackoverflow.com/a/35392881 )
         var path_str = '{' + PathArrToStr(_state.ObjPath) + '} ';
+        _state.LastError = msg; // our state is in error now
         if (msg instanceof Error)
         {
             msg.message = path_str + msg.message;
@@ -228,7 +225,7 @@ function CheckConvertClassName(class_name)
     else if (module.exports.IsClassInstance(class_name)) class_name = class_name.constructor.name;
     // if passed one of our objects that holds a class name
     else if (class_name instanceof XmlTemplateItem) class_name = class_name.ClassName;
-    else if (class_name instanceof XmlTemplate) class_name = class_name.getName();
+    else if (class_name instanceof XmlTemplate) class_name = class_name.getName(true);
     return class_name;
 }
 
@@ -352,7 +349,6 @@ class DictionaryFactory  // For now maybe we don't expose internal plumbing of g
         var t = new XmlTemplate(ArrayStub);
         var item = t.add('_Items_', this.PairName, 1, this.XmlNameSpace);
         item.DictionaryData = this;
-        //t.XmlNameSpace = this.XmlNameSpace; // does the template need to carry the name space as well?
         t.XmlPassthrough = '_Items_'; // in xml processing, this class is transparent, the value of Items replaces the class itself in XML
         return t;
     }
@@ -478,10 +474,9 @@ class XmlTemplateItem
         else if (arr_levels instanceof ArrayFactory) this.ArrayData = arr_levels;
         else this.ArrayData = new ArrayFactory(arr_levels, arr_namespace);
         this.NullableData = (isNullable ? {} : null);
-        this.AttrData = null;
+        this.AttrData = null; // Add a member for tracking XML element vs attribute
         // temp runtime props
         //this.DictionaryData = null; // can hold a DictionaryFactory in a KeyValuePair during XML processing
-        // Add a member for tracking XML element vs attribute?
     }
     _checkArray(opts)
     {
@@ -650,6 +645,11 @@ class XmlTemplate
         var prop_name = ; // need to either determine original name or pass separately?
         this.add(prop_name, class_name);
     }*/
+    /**
+     * Sorts the properties list by property names
+     * @param {?boolean} [skip_inherited=null] If true, any inherited props are ignored and put at top of the list in the order they are encounted.
+     * @returns {XmlTemplate} This instance
+     */
     sortByName(skip_inherited)
     {
         if (skip_inherited)
@@ -661,8 +661,14 @@ class XmlTemplate
             this.Props = inherited.concat(other);
         }
         else this.Props.sort(function(a,b) { return (a.Name<b.Name ? -1 : (a.Name>b.Name ? 1 : 0)); });
+        return this;
     }
-    setXmlNameSpace(xml_namespace) { this.XmlNameSpace = xml_namespace; }
+    /**
+     * Sets the XML namespace for this class template
+     * @param {string} xml_namespace The full XML namespace to use for this class
+     * @returns {XmlTemplate} This instance
+     */
+    setXmlNameSpace(xml_namespace) { this.XmlNameSpace = xml_namespace; return this; }
     // parsing/generating methods for various kinds of XML library objects
     /**
      * Deserializes this class from the given XML node
@@ -681,14 +687,14 @@ class XmlTemplate
         {
             try
             {
-                _state.ObjPath.push((this.XmlPassthrough==prop.Name ? prop.ClassName : prop.Name));
+                _state.pushPath(this, prop);
                 var xml_node;
                 if (this.XmlPassthrough) xml_node = xml2js_obj;
                 else if (prop.AttrData) xml_node = xml2js_GetAttr(xml2js_obj, prop.Name);
-                else xml_node = xml2js_obj[_state.Prefix+prop.Name];
+                else xml_node = xml2js_obj[_state.prefix(prop.Name)];
                 if (xml_node!=undefined) // XML has this class property
                 {
-                    var prev_prefix = _state.Prefix;
+                    var prevNS = _state.saveNsState();
                     var new_item = undefined; // null is a valid answer, so use undefined until it is defined
                     // xml2js default has everything an array in case there are multiple tags of the same name.
                     // We assume class properties are only used once and thus grab the first
@@ -705,13 +711,11 @@ class XmlTemplate
                     var ns = factory._findNS(prop, opts, _state);
                     if (ns != null)
                     {
-                        //if(ns=='') _state.Prefix = '';
-                        if (ns=='' || ns == _state.RootNameSpace) _state.Prefix = '';
+                        if (ns=='' || ns == _state.RootNameSpace) _state.setPrefix(ns, null, opts);
                         else
                         {
                             let pns = xml2js_FindNS(xml_node, ns);
-                            if (pns!=null) _state.Prefix = pns + ':';
-                            //else throw new Error("Cannot find XML namespace " + ns);
+                            _state.setPrefix(ns, pns, opts);
                         }
                     }
                     if (prop.ArrayData)   // we expect an array of a single type
@@ -719,7 +723,7 @@ class XmlTemplate
                         prop = prop._checkArray(opts);
                         // xml2js will turn our type tags into a property containing the sub nodes as another array.
                         // At this point we have {type:[value,...]}
-                        var node_arr = xml_node[_state.Prefix+prop.ArrayData.getTopTag()];
+                        var node_arr = xml_node[_state.prefix(prop.ArrayData.getTopTag())];
                         if (node_arr==undefined)
                         {
                             if (this.XmlPassthrough==prop.Name) new_obj[prop.Name] = null;
@@ -738,8 +742,6 @@ class XmlTemplate
                             _state.ObjPath.pop();
                         }, this);
                         new_obj[prop.Name] = new_item;
-                        /* if (new_item.length>0) new_obj[prop.Name] = new_item; // null is a valid answer
-                        else new_obj[prop.Name] = null; */
                     }
                     else // we expect a single value
                     {
@@ -747,7 +749,7 @@ class XmlTemplate
                         new_item = factory._decodeType(xml_node, prop, mods, '_from_xml2js', opts, _state);
                         if (new_item!==undefined) new_obj[prop.Name] = new_item; // null is a valid answer
                     }
-                    _state.Prefix = prev_prefix;
+                    _state.loadNsState(prevNS);
                 }
                 //else new_obj[prop.Name] = null; // XML does not have this prop, so it must be null? Actually value should be unchanged.
             }
@@ -756,7 +758,7 @@ class XmlTemplate
                 if (e instanceof XmlSerializerError) throw e;
                 else throw new XmlSerializerError(opts, _state, e);
             }
-            finally { _state.ObjPath.pop(); } // in case of a normal return from try block (after catch state is useless)
+            finally { _state.popAll(); } // in case of a normal return from try block (after catch state is useless)
         }, this);
         return new_obj;
     }
@@ -778,14 +780,14 @@ class XmlTemplate
         {
             try
             {
-                _state.ObjPath.push((this.XmlPassthrough==prop.Name ? prop.ClassName : prop.Name));
-                var prevNS = _state.saveNsState();
                 var new_item;
-                var ns = factory._applyNS(prop, opts, _state);
+                _state.pushPath(this, prop);
+                var prevNS = _state.saveNsState();
+                var ns = _state.applyNS(factory._findNS(prop, opts, _state), opts);
                 var cur_data = class_inst[prop.Name];
                 if (cur_data==null)
                 {
-                    if (prop.NullableData || opts.UseNil) new_obj[prevNS.Prefix+prop.Name] = new_item = xml2js_AddAttr(new_item, _state.XmlInstance+':nil', 'true');
+                    if (prop.NullableData || opts.UseNil) new_obj[prevNS.prefix(prop.Name)] = new_item = xml2js_AddAttr(new_item, _state.XmlInstance+':nil', 'true');
                 }
                 else if (prop.ArrayData)
                 {
@@ -809,10 +811,10 @@ class XmlTemplate
                         _state.ObjPath.pop();
                     },this);
                     var wrap = {};
-                    wrap[_state.Prefix+prop.ArrayData.getTopTag()] = arr;
+                    wrap[_state.prefix(prop.ArrayData.getTopTag())] = arr;
                     new_item = wrap;
                     if (this.XmlPassthrough) new_obj[prop.Name] = new_item;
-                    else new_obj[prevNS.Prefix+prop.Name] = new_item;
+                    else new_obj[prevNS.prefix(prop.Name)] = new_item;
                 }
                 else    // single node is pretty straight forward for xml2js
                 {
@@ -823,13 +825,10 @@ class XmlTemplate
                     if (mods.DerivedClass) xml2js_AddAttr(new_item, _state.XmlInstance+':type', mods.DerivedClass);
                     if (prop.AttrData && new_item != null) xml2js_AddAttr(new_obj, prop.Name, new_item);
                     else if (this.XmlPassthrough) new_obj[prop.Name] = new_item;
-                    else new_obj[prevNS.Prefix+prop.Name] = new_item;
+                    else new_obj[prevNS.prefix(prop.Name)] = new_item;
                 }
-                if (!_state.compNsState(prevNS) && _state.Prefix && ns)
-                {
-                    --_state.PrefixCount;
-                    xml2js_AddAttrFront(new_item, 'xmlns:'+_state.Prefix.slice(0,-1), ns);
-                }
+                var ns_prefix = _state.checkForNsChange(prevNS, ns);
+                if (ns_prefix) xml2js_AddAttrFront(new_item, 'xmlns:'+ns_prefix, ns);
                 _state.loadNsState(prevNS);
             }
             catch (e)
@@ -837,7 +836,7 @@ class XmlTemplate
                 if (e instanceof XmlSerializerError) throw e;
                 else throw new XmlSerializerError(opts, _state, e);
             }
-            finally { _state.ObjPath.pop(); } // in case of a normal return from try block (after catch state is useless)
+            finally { _state.popAll(); } // in case of a normal return from try block (after catch state is useless)
         }, this);
         return (this.XmlPassthrough ? new_obj[this.XmlPassthrough] : new_obj);
     }
@@ -927,6 +926,7 @@ class XmlTemplateFactory
     /**
      * Add a class XML template to the factory.
      * @param {Function|XmlTemplate} xml_template Class function (with static getXmlTemplate) or XmlTemplate instance.
+     * @return {XmlTemplateFactory} This factory instance
      */
     add(xml_template)
     {
@@ -1167,22 +1167,11 @@ class XmlTemplateFactory
         if (tp!=null) return tp.XmlNameSpace;
         return null;
     }
-    _applyNS(prop_info, opts, _state)
-    {
-        var ns = this._findNS(prop_info, opts, _state);
-        if (ns != null)
-        {
-            if(ns=='' || ns == _state.RootNameSpace) _state.Prefix = '';
-            else if (_state.CurNameSpace != ns)
-            {
-                // TODO - does state need a namespace stack !?! Or just track cur namespace alongside prefix?
-                ++_state.PrefixCount;
-                _state.Prefix = 'ns' + _state.PrefixCount +':';
-            }
-        }
-        _state.CurNameSpace = ns;
-        return ns;
-    }
+    /**
+     * Loops all the templates and attempts to add XML namespaces where they are not already defined based on DataContract style XML.
+     * @param {string} default_namespace Typically the root namespace. Basically applied to all templates without an existing namespace
+     * @return {XmlTemplateFactory} This factory instance
+     */
     applyDataContractNameSpaces(default_namespace)
     {
         // By default, nothing has a namespace.
@@ -1289,6 +1278,9 @@ class XmlProcOptions
 {
     constructor(user_opts)
     {
+        // Define defaults here
+        this.XmlMode=module.exports.xmlModes.XmlSerializer;
+        // Apply user overrides here
         Object.assign(this, user_opts);
         // if user did not state a UseNil preference and we are doing DataContract, flip UseNil true
         if (this.UseNil == undefined && this.isDC()) this.UseNil = true;
@@ -1306,18 +1298,83 @@ class XmlProcState
     constructor()
     {
         this.ObjPath = [];
-        this.Prefix = '';
-        this.PrefixCount = 0;
-        this.CurNameSpace = null;
+        this.RootNameSpace = null;
+        //this.NameSpaceStack = [];
+        this.NS = new XmlNameSpaceState();
     }
-    appendPrefix(tag)
+    prefix(tag) { return this.NS.prefix(tag); }
+    saveNsState() { return this.NS.clone(); }
+    loadNsState(prevNS) { this.NS = prevNS; }
+    setPrefix(ns, prefix, opts) // used in 'from' when we encounter new namespace
     {
-        return this.Prefix + ':' + tag;
+        if (ns != null)
+        {
+            //if(ns=='') _state.Prefix = '';
+            if (ns=='' || ns == this.RootNameSpace) this.NS.Prefix = '';
+            else
+            {
+                if (prefix!=null) this.NS.Prefix = prefix;
+                //else throw new Error("Cannot find XML namespace " + ns);
+            }
+        }
     }
-    saveNsState() { return {Prefix: this.Prefix, CurNameSpace: this.CurNameSpace}; }
-    loadNsState(prev) { this.Prefix = prev.Prefix; this.CurNameSpace = prev.CurNameSpace; }
-    compNsState(prev) { return (this.Prefix==prev.Prefix); }
+    applyNS(ns, opts) // used in 'to' when we encounter new namespace
+    {
+        if (ns != null)
+        {
+            if(ns=='' || ns == this.RootNameSpace) this.NS.Prefix = '';
+            else if (this.NS.CurNameSpace != ns)
+            {
+                // TODO - does state need a namespace stack !?! Or just track cur namespace alongside prefix?
+                ++this.NS.PrefixCount;
+                this.NS.Prefix = 'ns' + this.NS.PrefixCount;
+            }
+        }
+        this.NS.CurNameSpace = ns;
+        return ns;
+    }
+    checkForNsChange(prevNS, ns) // (used in 'to') if ns change, return prefix so we can tag it with xmlns
+    {
+        if (this.NS.Prefix!=prevNS.Prefix && this.NS.Prefix && ns)
+        {
+            --this.NS.PrefixCount;
+            return this.NS.Prefix;
+        }
+        return null;
+    }
+    pushPath(xml_temp, prop) // centralize this form of push so we can fine tune it in one place
+    {
+        this.ObjPath.push((xml_temp.XmlPassthrough==prop.Name ? prop.ClassName : prop.Name));
+    }
+    popAll() // provide single pop function in case other stacks are added?
+    {
+        if (this.LastError==undefined) this.ObjPath.pop(); // if in midst of err throw, don't pop?
+    }
 }
+/**
+ * XML Namespace state may need to be saved or stacked, so create a standardized object for it
+ * @private
+ */
+class XmlNameSpaceState
+{
+    constructor()
+    {
+        this.Prefix = '';           //string
+        this.PrefixCount = 0;       //number
+        this.CurNameSpace = null;   //string
+    }
+    clone()
+    {
+        var n = new XmlNameSpaceState();
+        Object.assign(n, this);
+        return n;
+    }
+    prefix(tag)
+    {
+        return (this.Prefix ? this.Prefix + ':' + tag : tag);
+    }
+}
+
 
 // region "xml2js helpers"
 function xml2js_FindNS(node, ns)
