@@ -16,13 +16,17 @@
   "files": [
     "xml-csharp-cereal.js",
     "package.json"
-  ],  
+  ],
   "keywords": [
     "C#",
     "csharp",
     "xml",
+    "cereal",
+    "cerealize",
     "serialize",
-    "serialization"
+    "serialization",
+    "cerealizer",
+    "serializer"
   ],
   "author": "CyDragon80",
   "license": "Unlicense",

@@ -18,7 +18,7 @@ During parsing from XML, class constructors are called without arguments (unless
 /*
 DataContractSerializer notes (if we go there)
 -Root tag notes full class namespace xmlns="http://schemas.datacontract.org/2004/07/csharpxml.Test1".
--All tag are in alphabetical order, AND derived class tags are after parent tags.
+-All prop tag are in alphabetical order, AND derived class props are after parent props.
 -No tags can be omitted, nulls use attribute nil="true".
 -Arrays and dictionaries are tagged xmlns:d2p1="http://schemas.microsoft.com/2003/10/Serialization/Arrays".
 -Jagged Array and dictionary type tags follow different naming convention compared to XmlSerializer.
@@ -108,62 +108,91 @@ function PathArrToStr(arr)
  * @return {any} the decoded value
  */
 
-module.exports.DecodeInt = function DecodeInt(val)
+module.exports.decodeInt = function decodeInt(val)
 {
     var n = parseInt(val);
     if (Number.isFinite(n)) return n;
-    throw new Error('Value cannot be parsed to int (' + val + ')')
+    throw new Error('Value cannot be parsed to int (' + val + ')');
 }
-module.exports.DecodeFloat = function DecodeFloat(val)
+module.exports.decodeFloat = function decodeFloat(val)
 {
     var n = parseFloat(val);
     if (Number.isFinite(n)) return n;
-    throw new Error('Value cannot be parsed to float (' + val + ')')
+    throw new Error('Value cannot be parsed to float (' + val + ')');
 }
-module.exports.DecodeDouble = function DecodeDouble(val)
+module.exports.decodeDouble = function decodeDouble(val)
 {
     // parseFloat is effectively  parseDouble
     var n = parseFloat(val);
     if (Number.isFinite(n)) return n;
-    throw new Error('Value cannot be parsed to float (' + val + ')')
+    throw new Error('Value cannot be parsed to float (' + val + ')');
 }
-module.exports.DecodeBool = function DecodeBool(val)
+module.exports.decodeBool = function decodeBool(val)
 {
-    // if object, do try ValueOf or toString? is that presuming too much?
+    // if object, try ValueOf or toString? is that presuming too much?
     if (module.exports.IsString(val))
     {
         if (val.toUpperCase()=='TRUE') return true;
         if (val.toUpperCase()=='FALSE') return false;
-        var num = module.exports.DecodeInt(val); // if '1' or '0' perhaps?
-        return (num != 0);  // any non-zero value is true?
+        try
+        {
+            var num = module.exports.decodeInt(val); // if '1' or '0' perhaps?
+            return (num != 0);  // any non-zero value is true?
+        }
+        catch (e) { throw new Error('decodeBool cannot parse "' + val + '"'); }
     }
     else
     {
         return (val ? true : false); // rely on falsy/truthy ?
     }
 }
-module.exports.DecodeString = function DecodeString(val)
+module.exports.decodeString = function decodeString(val)
 {
     // process undefined the same as null or treat it as an error?
     if (val==null) return null; // should we return null or "" ? null seems more in tune with C# behavior?
     return val.toString(); // just in case it isn't already a string?
 }
-module.exports.DecodeDateTime = function DecodeDateTime(val)
+module.exports.decodeDateTime = function decodeDateTime(val)
 {
-    // '2018-05-30T17:30:00'
+    // ISO 8601 i.e. '2018-05-30T17:30:00'
     // process undefined the same as null or treat it as an error?
     if (val==null) return null; // could be nullable
     return new Date(val);
 }
-/* Might want to defer due to many possible approaches and external libraries?
-module.exports.DecodeTimeSpan = function DecodeTimeSpan(val)
+//Might want to defer due to the many possible approaches and external libraries? Maybe provide a basic 'as seconds' default?
+module.exports.decodeTimeSpan = function decodeTimeSpan(val)
 {
-    // 'P1DT10H17M36.789S'
-    // There's moment.isoduration.js or TimeSpan.js ?
+    // ISO 8601 i.e. 'P1DT10H17M36.789S'
+    // There's moment.js, TimeSpan.js, etc libraries to choose from for fuller feature sets?
     // process undefined the same as null or treat it as an error?
     if (val==null) return null; // could be nullable
-    return new Date(val);
-}*/
+    // adapted from http://momentjs.com [MIT] (citing http://docs.closure-library.googlecode.com/git/closure_goog_date_date.js.source.html)
+    // see isoRegex in 'moment/src/lib/duration/create.js'
+    var isoRegex = /^(-|\+)?P(?:([-+]?[0-9,.]*)Y)?(?:([-+]?[0-9,.]*)M)?(?:([-+]?[0-9,.]*)W)?(?:([-+]?[0-9,.]*)D)?(?:T(?:([-+]?[0-9,.]*)H)?(?:([-+]?[0-9,.]*)M)?(?:([-+]?[0-9,.]*)S)?)?$/;
+    var match = isoRegex.exec(val);
+    if (match)
+    {
+        // Based on some info from https://stackoverflow.com/a/34532410 and https://stackoverflow.com/a/12466271
+        var secs = ValOrZero(match[2])*31556926 // years
+            +ValOrZero(match[3])*2629743.83 // months
+            +ValOrZero(match[4])*604800 // weeks
+            +ValOrZero(match[5])*86400 // days
+            +ValOrZero(match[6])*3600 // hours
+            +ValOrZero(match[7])*60 // mintues
+            +ValOrZero(match[8]); // seconds
+        return (match[1] === '-' ? -secs : secs);
+    }
+    throw new Error('Cannot parse ISO time span "' + val + '"');
+}
+function ValOrZero(val)
+{
+    // adapted from http://momentjs.com [MIT] function parseIso() to use in decodeTimeSpan()
+    // we don't need to deal with sign here, cause we apply that after we get total seconds
+    // regex result is either a string or undefined
+    if (val==undefined) return 0;
+    val = parseFloat(val.replace(',', '.')); // I assume the replace is for locales that use comma for decimals?
+    return (Number.isFinite(val) ? val : 0);
+}
 
 /**
  * This callback takes value from object and encodes it into appropriate value for XML.
@@ -172,28 +201,36 @@ module.exports.DecodeTimeSpan = function DecodeTimeSpan(val)
  * @return {any} the encoded XML value
  */
 
-module.exports.EncodeString = function EncodeString(val)
+module.exports.encodeString = function encodeString(val)
 {
     return val.toString(); // just in case it isn't already a string?
 }
-module.exports.EncodeBool = function EncodeBool(val)
+module.exports.encodeBool = function encodeBool(val)
 {
     return (val ? 'true' : 'false'); // c sharp xml prints the lowercase string
 }
-module.exports.EncodePassthrough = function EncodePassthrough(val)
+module.exports.encodePassthrough = function encodePassthrough(val)
 {
     // numbers should passthrough fine, unless XML library needs them an explicit type?
     if (val instanceof Number) return val.valueOf(); // unwrap if in Number object ?
     return val; // no special processing required before passing to XML library
 }
-module.exports.EncodeDateTime = function EncodeDateTime(val)
+module.exports.encodeDateTime = function encodeDateTime(val)
 {
     // '2018-05-30T17:30:00'
     // process undefined the same as null, or should we catch and return err_val?
     if (val==null) return null; // could be nullable
     if (val instanceof Date) return val.toISOString();
     if (module.exports.IsString(val)) return val; // assume if string, it's just passing through
-    throw new Error('EncodeDateTime requires instance of Date or a string');
+    throw new Error('encodeDateTime requires instance of Date or a string');
+}
+module.exports.encodeTimeSpan = function encodeTimeSpan(val)
+{
+    if (val==null) return null;
+    val = parseFloat(val); // in case it is not a number already (or could use Number() or '+' operator?)
+    if (!Number.isFinite(val)) throw new Error('encodeTimeSpan requires a number of seconds');
+    // Is this cheap? Yes. Yes it is.
+    return "PT" + val + "S"; // val assumed to be seconds
 }
 
 // endregion "Some parsers for primitive node values" -----
@@ -673,13 +710,12 @@ class XmlTemplate
     /**
      * Deserializes this class from the given XML node
      * @private
-     * @param {XmlTemplateFactory} factory Instance of XML factory to use
      * @param {Object} xml2js_obj An xml2js object describing an XML file
      * @param {Object} opts Options to be used during the deserialization process
      * @param {Object} _state Internal state information
      * @return {Object} Instance of this class resulting from the XML
      */
-    _from_xml2js(factory, xml2js_obj, opts, _state)
+    _from_xml2js(xml2js_obj, opts, _state)
     {
         if (xml2js_obj==null) return null;
         var new_obj = this.newObj();
@@ -708,7 +744,7 @@ class XmlTemplate
                         new_obj[prop.Name] = null;
                         return;
                     }
-                    var ns = factory._findNS(prop, opts, _state);
+                    var ns = _state.Factory._findNS(prop, opts, _state);
                     if (ns != null)
                     {
                         if (ns=='' || ns == _state.RootNameSpace) _state.setPrefix(ns, null, opts);
@@ -737,7 +773,7 @@ class XmlTemplate
                             var mods = {
                                 DerivedClass: xml2js_GetAttr(item,_state.XmlInstance+':type'),
                                 IsNull: (xml2js_GetAttr(item, _state.XmlInstance+':nil')=='true') };
-                            var temp = factory._decodeType(item, prop, mods, '_from_xml2js', opts, _state);
+                            var temp = _state.Factory._decodeType(item, prop, mods, opts, _state);
                             if (temp!==undefined) new_item.push(temp); // null is a valid answer
                             _state.ObjPath.pop();
                         }, this);
@@ -746,7 +782,7 @@ class XmlTemplate
                     else // we expect a single value
                     {
                         var mods = { DerivedClass: xml2js_GetAttr(xml_node,_state.XmlInstance+':type') }; // nil is handled already up top
-                        new_item = factory._decodeType(xml_node, prop, mods, '_from_xml2js', opts, _state);
+                        new_item = _state.Factory._decodeType(xml_node, prop, mods, opts, _state);
                         if (new_item!==undefined) new_obj[prop.Name] = new_item; // null is a valid answer
                     }
                     _state.loadNsState(prevNS);
@@ -766,13 +802,12 @@ class XmlTemplate
      *
      * Serializes this class to a XML node
      * @private
-     * @param {XmlTemplateFactory} factory Instance of XML factory to use
      * @param {Object} class_inst Instance of this class from which to produce XML
      * @param {Object} opts Options to be used during the deserialization process
      * @param {Object} _state Internal state information
      * @return {Object} xml2js object describing the resulting XML node
      */
-    _to_xml2js(factory, class_inst, opts, _state)
+    _to_xml2js(class_inst, opts, _state)
     {
         if (class_inst==null) return null;
         var new_obj = {};
@@ -783,7 +818,7 @@ class XmlTemplate
                 var new_item;
                 _state.pushPath(this, prop);
                 var prevNS = _state.saveNsState();
-                var ns = _state.applyNS(factory._findNS(prop, opts, _state), opts);
+                var ns = _state.applyNS(_state.Factory._findNS(prop, opts, _state), opts);
                 var cur_data = class_inst[prop.Name];
                 if (cur_data==null)
                 {
@@ -803,7 +838,7 @@ class XmlTemplate
                         else
                         {
                             var mods = {};
-                            arr_item = factory._encodeType(item, prop, mods, '_to_xml2js', opts, _state);
+                            arr_item = _state.Factory._encodeType(item, prop, mods, opts, _state);
                             if (arr_item===undefined) throw new Error('XmlTemplate._to_xml2js could not generate "' + prop.ClassName +'"');
                             if (mods.DerivedClass) xml2js_AddAttr(arr_item, _state.XmlInstance+':type', mods.DerivedClass);
                         }
@@ -820,7 +855,7 @@ class XmlTemplate
                 {
                     var mods = {};
                     var new_item;
-                    new_item = factory._encodeType(cur_data, prop, mods, '_to_xml2js', opts, _state);
+                    new_item = _state.Factory._encodeType(cur_data, prop, mods, opts, _state);
                     if (new_item===undefined) throw new Error('XmlTemplate._to_xml2js could not generate "' + prop.ClassName+'"');
                     if (mods.DerivedClass) xml2js_AddAttr(new_item, _state.XmlInstance+':type', mods.DerivedClass);
                     if (prop.AttrData && new_item != null) xml2js_AddAttr(new_obj, prop.Name, new_item);
@@ -872,37 +907,37 @@ class XmlTemplateFactory
         // Allow each factory to hold its own simple type handlers so they can be customized per factory
         this.SimpleTypeDecoders =
         {
-            'bool': module.exports.DecodeBool,
-            'string': module.exports.DecodeString,
-            'sbyte': module.exports.DecodeInt,
-            'byte': module.exports.DecodeInt,
-            'short': module.exports.DecodeInt, 'Int16': module.exports.DecodeInt,
-            'ushort': module.exports.DecodeInt, 'UInt16': module.exports.DecodeInt,
-            'int': module.exports.DecodeInt, 'Int32': module.exports.DecodeInt,
-            'uint': module.exports.DecodeInt, 'UInt32': module.exports.DecodeInt,
-            'long': module.exports.DecodeString, 'Int64': module.exports.DecodeString,
-            'ulong': module.exports.DecodeString, 'UInt64': module.exports.DecodeString,
-            'float': module.exports.DecodeFloat,
-            'double': module.exports.DecodeDouble,
-            'DateTime': module.exports.DecodeDateTime,
-            'TimeSpan': module.exports.DecodeString,
+            'bool': module.exports.decodeBool,
+            'string': module.exports.decodeString,
+            'sbyte': module.exports.decodeInt,
+            'byte': module.exports.decodeInt,
+            'short': module.exports.decodeInt, 'Int16': module.exports.decodeInt,
+            'ushort': module.exports.decodeInt, 'UInt16': module.exports.decodeInt,
+            'int': module.exports.decodeInt, 'Int32': module.exports.decodeInt,
+            'uint': module.exports.decodeInt, 'UInt32': module.exports.decodeInt,
+            'long': module.exports.decodeString, 'Int64': module.exports.decodeString,
+            'ulong': module.exports.decodeString, 'UInt64': module.exports.decodeString,
+            'float': module.exports.decodeFloat,
+            'double': module.exports.decodeDouble,
+            'DateTime': module.exports.decodeDateTime,
+            'TimeSpan': module.exports.decodeTimeSpan,
         };
         this.SimpleTypeEncoders =
         {
-            'bool': module.exports.EncodeBool,
-            'string': module.exports.EncodeString,
-            'sbyte': module.exports.EncodePassthrough,
-            'byte': module.exports.EncodePassthrough,
-            'short': module.exports.EncodePassthrough, 'Int16': module.exports.EncodePassthrough,
-            'ushort': module.exports.EncodePassthrough, 'UInt16': module.exports.EncodePassthrough,
-            'int': module.exports.EncodePassthrough, 'Int32': module.exports.EncodePassthrough,
-            'uint': module.exports.EncodePassthrough, 'UInt32': module.exports.EncodePassthrough,
-            'long': module.exports.EncodeString, 'Int64': module.exports.EncodeString,
-            'ulong': module.exports.EncodeString, 'UInt64': module.exports.EncodeString,
-            'float': module.exports.EncodePassthrough,
-            'double': module.exports.EncodePassthrough,
-            'DateTime': module.exports.EncodeDateTime,
-            'TimeSpan': module.exports.EncodeString,
+            'bool': module.exports.encodeBool,
+            'string': module.exports.encodeString,
+            'sbyte': module.exports.encodePassthrough,
+            'byte': module.exports.encodePassthrough,
+            'short': module.exports.encodePassthrough, 'Int16': module.exports.encodePassthrough,
+            'ushort': module.exports.encodePassthrough, 'UInt16': module.exports.encodePassthrough,
+            'int': module.exports.encodePassthrough, 'Int32': module.exports.encodePassthrough,
+            'uint': module.exports.encodePassthrough, 'UInt32': module.exports.encodePassthrough,
+            'long': module.exports.encodeString, 'Int64': module.exports.encodeString,
+            'ulong': module.exports.encodeString, 'UInt64': module.exports.encodeString,
+            'float': module.exports.encodePassthrough,
+            'double': module.exports.encodePassthrough,
+            'DateTime': module.exports.encodeDateTime,
+            'TimeSpan': module.exports.encodeTimeSpan,
         };
         this.SimpleTypeNameSpaces = {}; // defaults are all buit-in and have no namespace
         /* this.SimpleTypeMeta =
@@ -1014,19 +1049,18 @@ class XmlTemplateFactory
      * @param {any} obj Instance of the property to be decoded
      * @param {XmlTemplateItem} prop_info XML template for the give property
      * @param {Object} mods XML Modifiers such as 'type'
-     * @param {string} from_method Name of the function to call on prop_info to process next level of XML processing
      * @param {Object} opts Options to pass through to next level of XML processing
      * @param {Object} _state State to pass through to next level of XML processing
      * @return {any} Value of the decoded type (could be simple type or another object)
      */
-    _decodeType(obj, prop_info, mods, from_method, opts, _state)
+    _decodeType(obj, prop_info, mods, opts, _state)
     {
         if (obj==null || mods.IsNull) return null;
         // check for jagged array
         if (prop_info.ArrayData && !prop_info.ArrayData.isOneDim())
         {
             var tp = prop_info.ArrayData.nextTemp(prop_info);
-            var new_item = tp[from_method](this, obj, opts, _state);
+            var new_item = tp[_state.MethodName](obj, opts, _state);
             return (Array.isArray(new_item._Items_) ?  new_item._Items_ : null);
         }
         // check for generic Object used as dictionary
@@ -1034,13 +1068,13 @@ class XmlTemplateFactory
         {
             // obj is an instance of the KeyValuePairStub
             var tp = prop_info.DictionaryData.createPairTemplate();
-            return tp[from_method](this, obj, opts, _state);
+            return tp[_state.MethodName](obj, opts, _state);
         }
         var dict_factory = this.ImplicitDicts[prop_info.ClassName];
         if (dict_factory)
         {
             var tp = dict_factory.createDictTemplate(prop_info.ClassName);
-            var new_item = tp[from_method](this, obj, opts, _state);
+            var new_item = tp[_state.MethodName](obj, opts, _state);
             // convert stub into {}
             var dict_obj = {};
             if (Array.isArray(new_item._Items_))
@@ -1072,7 +1106,7 @@ class XmlTemplateFactory
         var cn = (mods.DerivedClass ? mods.DerivedClass : prop_info.ClassName);
         var tp = this.find(cn);
         if (tp==null) throw new Error('XmlTemplateFactory cannot find type '+cn);  // return undefined to ignore, null to set obj instance to null, or should we throw error?
-        return tp[from_method](this, obj, opts, _state);
+        return tp[_state.MethodName](obj, opts, _state);
     }
     /**
      * Encodes an object property value into XML value
@@ -1080,12 +1114,11 @@ class XmlTemplateFactory
      * @param {any} obj Property value to encode
      * @param {XmlTemplateItem} prop_info Template describing the property to encode
      * @param {Object} mods XML Modifiers such as 'type' or 'nil' etc
-     * @param {string} to_method Name of prop_info function to call to process next level of XML processing
      * @param {Object} opts Options to pass through to next level of XML processing
      * @param {Object} _state state to pass through to next level of XML processing
      * @return {any} Value for use in XML
      */
-    _encodeType(obj, prop_info, mods, to_method, opts, _state)
+    _encodeType(obj, prop_info, mods, opts, _state)
     {
         if (obj==null) return null; // could set mods.IsNull=true, but probably faster/easier to check return or obj directly
         // check for jagged array
@@ -1093,14 +1126,14 @@ class XmlTemplateFactory
         {
             var tp = prop_info.ArrayData.nextTemp(prop_info);
             var stub_obj = {_Items_: obj};
-            return tp[to_method](this, stub_obj, opts, _state);
+            return tp[_state.MethodName](stub_obj, opts, _state);
         }
         // check for generic Object used as dictionary
         if (prop_info.DictionaryData)
         {
             // obj is an instance of the KeyValuePairStub
             var tp = prop_info.DictionaryData.createPairTemplate();
-            return tp[to_method](this, obj, opts, _state);
+            return tp[_state.MethodName](obj, opts, _state);
         }
         var dict_factory = this.ImplicitDicts[prop_info.ClassName];
         if (dict_factory)
@@ -1113,7 +1146,7 @@ class XmlTemplateFactory
                 arr.push(stub);
             }
             var tp = dict_factory.createDictTemplate(prop_info.ClassName);
-            return tp[to_method](this, {_Items_:arr}, opts, _state);
+            return tp[_state.MethodName]({_Items_:arr}, opts, _state);
         }
         // check for enum
         var enum_obj = this.Enums[prop_info.ClassName];
@@ -1141,7 +1174,7 @@ class XmlTemplateFactory
         //if (tp==null) return undefined;  // return undefined to throw, or null to include it as null tag?
         if (tp==null) throw new Error('XmlTemplateFactory cannot find type '+cn);
         mods.DerivedClass = (otp === tp ? null : tp.getName());
-        return tp[to_method](this, obj, opts, _state);
+        return tp[_state.MethodName](obj, opts, _state);
     }
     _checkForDerived(obj, tp)
     {
@@ -1220,7 +1253,7 @@ class XmlTemplateFactory
     {
         // set up any options or initial internal state values
         options = new XmlProcOptions(options);
-        var _state = new XmlProcState();
+        var _state = new XmlProcState(this, '_from_xml2js');
         // get root node
         var props = Object.getOwnPropertyNames(xml2js_obj);
         if (!Array.isArray(props)) props = Object.getOwnPropertyNames(props); // if not an array, assume root is first property
@@ -1234,7 +1267,7 @@ class XmlTemplateFactory
         var inst_ns = xml2js_FindNS(root_node, 'http://www.w3.org/2001/XMLSchema-instance');
         if (inst_ns) _state.XmlInstance = inst_ns;
         _state.RootNameSpace = root_temp.XmlNameSpace;
-        return root_temp._from_xml2js(this, xml2js_obj[props[0]], options, _state);
+        return root_temp._from_xml2js(xml2js_obj[props[0]], options, _state);
     }
     /**
      * Creates a new object for xml2js to use from given instance of a known class.
@@ -1246,7 +1279,7 @@ class XmlTemplateFactory
     {
         // set up any options or initial internal state values
         options = new XmlProcOptions(options);
-        var _state = new XmlProcState();
+        var _state = new XmlProcState(this, '_to_xml2js');
         // find the root object in the xml factory
         var class_name;
         if (module.exports.IsClassInstance(root_obj)) class_name = root_obj.constructor.name;
@@ -1258,7 +1291,7 @@ class XmlTemplateFactory
         var xml_obj = {};
         _state.XmlInstance = (temp.XmlNameSpace ? 'i' : 'xsi'); // we will add the actual namespace at the end
         _state.RootNameSpace = temp.XmlNameSpace;
-        xml_obj[class_name] = temp._to_xml2js(this, root_obj, options, _state);
+        xml_obj[class_name] = temp._to_xml2js(root_obj, options, _state);
         if (typeof(xml_obj[class_name])=='object')
         {
             // add typical namespaces, taking care not to blow away any attributes already there
@@ -1295,8 +1328,10 @@ class XmlProcOptions
  */
 class XmlProcState
 {
-    constructor()
+    constructor(factory, method_name)
     {
+        this.Factory = factory; // XML factory in use
+        this.MethodName = method_name; // method name for recursion
         this.ObjPath = [];
         this.RootNameSpace = null;
         //this.NameSpaceStack = [];
