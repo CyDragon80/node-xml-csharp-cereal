@@ -67,12 +67,12 @@ class TestClass
         temp.addUInt('MyUInt');
         temp.addLong('MyLong');
         temp.addDouble('MyDouble');
+        temp.addInt('MyJagIntArray2', 3);
         temp.addInt('MyNullInt').nullable();
         temp.addInt('MyNullIntArr', 1).nullable();
         temp.addInt('MyIntArray', 1)
         //temp.addInt('MyJagIntArray', 2); // jagged array has two dimensions
         temp.addInt('MyJagIntArray', ['int','ArrayOfInt']);
-        temp.addInt('MyJagIntArray2', 3);
         temp.add('MyJagEnumArray', 'MyEnum', 2);
         temp.addString('MyStrList', 1);
         temp.add('MySubClass', 'SubTestClass');
@@ -81,8 +81,8 @@ class TestClass
         temp.add('MyIntDictArr', 'SerializableDictionaryOfStringInt32', 1);
         temp.add('MySubClassDict', 'SerializableDictionaryOfStringSubTestClass');
         // complex embedding?
-        temp.add('MyIntDictDict', 'SerializableDictionaryOfStringSerializableDictionaryOfStringInt32');
         temp.add('MyEnumArrDict', 'SerializableDictionaryOfStringArrayOfMyEnum');
+        temp.add('MyIntDictDict', 'SerializableDictionaryOfStringSerializableDictionaryOfStringInt32');
         temp.add('MyIntDictArrDict', 'SerializableDictionaryOfStringArrayOfSerializableDictionaryOfStringInt32');
         temp.addDateTime('MyTime');
         temp.addTimeSpan('MySpan');

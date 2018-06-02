@@ -2,6 +2,7 @@
 /**
  * Node.js XML serializer with an eye toward limited C# XmlSerializer compatibility
  * @module xml-csharp-cereal
+ * @license Unlicense (DISCLAIMER: Authors and contributors assume no liability or warranty)
  */
 
 // Put a copy of package.json version here in case module is used by itself.
@@ -14,6 +15,26 @@ However we must create xml template classes to describe the structure and aid in
 It is assumed all arrays have elements of the same type, or base type.
 During parsing from XML, class constructors are called without arguments (unless a default set is stored in its template).
 */
+
+// We need a DOMImplementation in order to create a xml doc (unless we force user to pass one to us?)
+//const xmldom = TryRequire('xmldom');
+var myDOMImplementation = null;
+function getDOMImplementation()
+{
+    if (myDOMImplementation) return myDOMImplementation; // if we already made one, use it
+    // see if xmldom is available (one could possibly check for presence of browser xml dom?)
+    //if (typeof(document) !== 'undefined' && typeof(document.implementation) !== 'undefined') return document.implementation;
+    var xmldom = TryRequire('xmldom');
+    if (xmldom==null) return null;
+    myDOMImplementation = new xmldom.DOMImplementation();
+    return myDOMImplementation;
+}
+function TryRequire(name)
+{
+    // check err.code === 'MODULE_NOT_FOUND' ? or require.resolve() ?
+    try { return require(name); }
+    catch (e) { return null; }
+}
 
 /*
 DataContractSerializer notes (if we go there)
@@ -710,14 +731,14 @@ class XmlTemplate
     /**
      * Deserializes this class from the given XML node
      * @private
-     * @param {Object} xml2js_obj An xml2js object describing an XML file
+     * @param {Object} xml_obj Current XML node
      * @param {Object} opts Options to be used during the deserialization process
      * @param {Object} _state Internal state information
      * @return {Object} Instance of this class resulting from the XML
      */
-    _from_xml2js(xml2js_obj, opts, _state)
+    _from_xmlobj(xml_obj, opts, _state)
     {
-        if (xml2js_obj==null) return null;
+        if (xml_obj==null) return null;
         var new_obj = this.newObj();
         this.Props.forEach(function(prop)
         {
@@ -725,21 +746,13 @@ class XmlTemplate
             {
                 _state.pushPath(this, prop);
                 var xml_node;
-                if (this.XmlPassthrough) xml_node = xml2js_obj;
-                else if (prop.AttrData) xml_node = xml2js_GetAttr(xml2js_obj, prop.Name);
-                else xml_node = xml2js_obj[_state.prefix(prop.Name)];
+                if (this.XmlPassthrough || prop.AttrData) xml_node = xml_obj;
+                else xml_node = xml_obj.getFirstNode(_state.prefix(prop.Name));
                 if (xml_node!=undefined) // XML has this class property
                 {
                     var prevNS = _state.saveNsState();
                     var new_item = undefined; // null is a valid answer, so use undefined until it is defined
-                    // xml2js default has everything an array in case there are multiple tags of the same name.
-                    // We assume class properties are only used once and thus grab the first
-                    if (Array.isArray(xml_node) && !this.XmlPassthrough)
-                    {
-                        if (xml_node.length<1) return;
-                        else xml_node = xml_node[0];
-                    }
-                    if (xml2js_GetAttr(xml_node, _state.XmlInstance+':nil')=='true') // regardless of being nullable, if tagged nil make it null
+                    if (xml_node.getAttr(_state.XmlInstance+':nil')=='true') // regardless of being nullable, if tagged nil make it null
                     {
                         new_obj[prop.Name] = null;
                         return;
@@ -750,7 +763,7 @@ class XmlTemplate
                         if (ns=='' || ns == _state.RootNameSpace) _state.setPrefix(ns, null, opts);
                         else
                         {
-                            let pns = xml2js_FindNS(xml_node, ns);
+                            let pns = xml_node.findNS(ns);
                             _state.setPrefix(ns, pns, opts);
                         }
                     }
@@ -759,20 +772,20 @@ class XmlTemplate
                         prop = prop._checkArray(opts);
                         // xml2js will turn our type tags into a property containing the sub nodes as another array.
                         // At this point we have {type:[value,...]}
-                        var node_arr = xml_node[_state.prefix(prop.ArrayData.getTopTag())];
+                        var node_arr = xml_node.getNodes(_state.prefix(prop.ArrayData.getTopTag()));
                         if (node_arr==undefined)
                         {
                             if (this.XmlPassthrough==prop.Name) new_obj[prop.Name] = null;
+                            else new_obj[prop.Name] = []; // tag was there but empty, so empty array?
                             return;
                         }
-                        if (!Array.isArray(node_arr)) node_arr = [node_arr]; // in case it isn't in an array
                         new_item = [];
                         node_arr.forEach(function(item,index)
                         {
                             _state.ObjPath.push(index);
                             var mods = {
-                                DerivedClass: xml2js_GetAttr(item,_state.XmlInstance+':type'),
-                                IsNull: (xml2js_GetAttr(item, _state.XmlInstance+':nil')=='true') };
+                                DerivedClass: item.getAttr(_state.XmlInstance+':type'),
+                                IsNull: (item.getAttr(_state.XmlInstance+':nil')=='true') };
                             var temp = _state.Factory._decodeType(item, prop, mods, opts, _state);
                             if (temp!==undefined) new_item.push(temp); // null is a valid answer
                             _state.ObjPath.pop();
@@ -781,7 +794,8 @@ class XmlTemplate
                     }
                     else // we expect a single value
                     {
-                        var mods = { DerivedClass: xml2js_GetAttr(xml_node,_state.XmlInstance+':type') }; // nil is handled already up top
+                        var mods = { DerivedClass: xml_node.getAttr(_state.XmlInstance+':type') }; // nil is handled already up top
+                        if (prop.AttrData) xml_node = xml_obj.getAttr(prop.Name);
                         new_item = _state.Factory._decodeType(xml_node, prop, mods, opts, _state);
                         if (new_item!==undefined) new_obj[prop.Name] = new_item; // null is a valid answer
                     }
@@ -803,67 +817,55 @@ class XmlTemplate
      * Serializes this class to a XML node
      * @private
      * @param {Object} class_inst Instance of this class from which to produce XML
+     * @param {Object} xml_obj Current XML node
      * @param {Object} opts Options to be used during the deserialization process
      * @param {Object} _state Internal state information
-     * @return {Object} xml2js object describing the resulting XML node
+     * @return {Object} XML object describing the resulting XML node
      */
-    _to_xml2js(class_inst, opts, _state)
+    _to_xmlobj(class_inst, xml_obj, opts, _state)
     {
-        if (class_inst==null) return null;
-        var new_obj = {};
+        if (class_inst==null) return null; // this better not be null at this point!
         this.Props.forEach(function(prop)
         {
             try
             {
-                var new_item;
+                var new_item = (this.XmlPassthrough ? xml_obj : xml_obj.makeNode(_state.prefix(prop.Name)));
                 _state.pushPath(this, prop);
                 var prevNS = _state.saveNsState();
                 var ns = _state.applyNS(_state.Factory._findNS(prop, opts, _state), opts);
+                var ns_prefix = _state.checkForNsChange(prevNS, ns);
+                if (ns_prefix) new_item.addAttr('xmlns:'+ns_prefix, ns);
                 var cur_data = class_inst[prop.Name];
                 if (cur_data==null)
                 {
-                    if (prop.NullableData || opts.UseNil) new_obj[prevNS.prefix(prop.Name)] = new_item = xml2js_AddAttr(new_item, _state.XmlInstance+':nil', 'true');
+                    if ((prop.NullableData && prop.ArrayData==null) || opts.UseNil )
+                    {
+                        new_item.addAttr(_state.XmlInstance+':nil', 'true');
+                        if (xml_obj!==new_item) xml_obj.addNode(new_item);
+                    }
                 }
                 else if (prop.ArrayData)
                 {
                     prop = prop._checkArray(opts);
                     if (!Array.isArray(cur_data)) cur_data = [cur_data];
-                    // xml2js needs typed arrays presented to it as {type:[value,...]}
-                    var arr = [];
                     cur_data.forEach(function(item,index)
                     {
                         _state.ObjPath.push(index);
-                        var arr_item;
-                        if (item==null) arr_item = xml2js_AddAttr(arr_item, _state.XmlInstance+':nil', 'true'); // null array items must be listed
-                        else
-                        {
-                            var mods = {};
-                            arr_item = _state.Factory._encodeType(item, prop, mods, opts, _state);
-                            if (arr_item===undefined) throw new Error('XmlTemplate._to_xml2js could not generate "' + prop.ClassName +'"');
-                            if (mods.DerivedClass) xml2js_AddAttr(arr_item, _state.XmlInstance+':type', mods.DerivedClass);
-                        }
-                        arr.push(arr_item);
+                        var arr_item = new_item.makeNode(_state.prefix(prop.ArrayData.getTopTag()));
+                        arr_item = _state.Factory._encodeType(item, prop, arr_item, opts, _state);
+                        if (arr_item===undefined) throw new Error('XmlTemplate._to_xmlobj could not generate "' + prop.ClassName +'"');
+                        new_item.addNode(arr_item);
                         _state.ObjPath.pop();
                     },this);
-                    var wrap = {};
-                    wrap[_state.prefix(prop.ArrayData.getTopTag())] = arr;
-                    new_item = wrap;
-                    if (this.XmlPassthrough) new_obj[prop.Name] = new_item;
-                    else new_obj[prevNS.prefix(prop.Name)] = new_item;
+                    if (xml_obj!==new_item) xml_obj.addNode(new_item);
                 }
                 else    // single node is pretty straight forward for xml2js
                 {
-                    var mods = {};
-                    var new_item;
-                    new_item = _state.Factory._encodeType(cur_data, prop, mods, opts, _state);
-                    if (new_item===undefined) throw new Error('XmlTemplate._to_xml2js could not generate "' + prop.ClassName+'"');
-                    if (mods.DerivedClass) xml2js_AddAttr(new_item, _state.XmlInstance+':type', mods.DerivedClass);
-                    if (prop.AttrData && new_item != null) xml2js_AddAttr(new_obj, prop.Name, new_item);
-                    else if (this.XmlPassthrough) new_obj[prop.Name] = new_item;
-                    else new_obj[prevNS.prefix(prop.Name)] = new_item;
+                    new_item = _state.Factory._encodeType(cur_data, prop, new_item, opts, _state);
+                    if (new_item===undefined) throw new Error('XmlTemplate._to_xmlobj could not generate "' + prop.ClassName+'"');
+                    if (prop.AttrData) xml_obj.addAttr(prop.Name, new_item.getValue());
+                    else if (xml_obj!==new_item) xml_obj.addNode(new_item);
                 }
-                var ns_prefix = _state.checkForNsChange(prevNS, ns);
-                if (ns_prefix) xml2js_AddAttrFront(new_item, 'xmlns:'+ns_prefix, ns);
                 _state.loadNsState(prevNS);
             }
             catch (e)
@@ -873,7 +875,7 @@ class XmlTemplate
             }
             finally { _state.popAll(); } // in case of a normal return from try block (after catch state is useless)
         }, this);
-        return (this.XmlPassthrough ? new_obj[this.XmlPassthrough] : new_obj);
+        return xml_obj;
     }
 } // END CLASS: XmlTemplate
 module.exports.XmlTemplate = XmlTemplate;
@@ -893,7 +895,7 @@ class XmlTemplateFactory
         this.ImplicitDicts = {}; // Implicit object dictionaries
         this.ClassNameAlias = {}; // Class name aliases
         // allow passing list of classes to constructor? both as variable param list or as an array?
-        Array.from(templates).forEach(function(arg)
+        templates.forEach(function(arg)
         {
             if (Array.isArray(arg))
             {
@@ -1046,35 +1048,35 @@ class XmlTemplateFactory
     /**
      * Decodes a given property from XML value to object value
      * @private
-     * @param {any} obj Instance of the property to be decoded
+     * @param {any} node XML node of the property to be decoded
      * @param {XmlTemplateItem} prop_info XML template for the give property
      * @param {Object} mods XML Modifiers such as 'type'
      * @param {Object} opts Options to pass through to next level of XML processing
      * @param {Object} _state State to pass through to next level of XML processing
      * @return {any} Value of the decoded type (could be simple type or another object)
      */
-    _decodeType(obj, prop_info, mods, opts, _state)
+    _decodeType(node, prop_info, mods, opts, _state)
     {
-        if (obj==null || mods.IsNull) return null;
+        if (node==null || mods.IsNull) return null;
         // check for jagged array
         if (prop_info.ArrayData && !prop_info.ArrayData.isOneDim())
         {
             var tp = prop_info.ArrayData.nextTemp(prop_info);
-            var new_item = tp[_state.MethodName](obj, opts, _state);
+            var new_item = tp[_state.MethodName](node, opts, _state);
             return (Array.isArray(new_item._Items_) ?  new_item._Items_ : null);
         }
         // check for generic Object used as dictionary
         if (prop_info.DictionaryData)
         {
-            // obj is an instance of the KeyValuePairStub
+            // node is an instance of the KeyValuePairStub
             var tp = prop_info.DictionaryData.createPairTemplate();
-            return tp[_state.MethodName](obj, opts, _state);
+            return tp[_state.MethodName](node, opts, _state);
         }
         var dict_factory = this.ImplicitDicts[prop_info.ClassName];
         if (dict_factory)
         {
             var tp = dict_factory.createDictTemplate(prop_info.ClassName);
-            var new_item = tp[_state.MethodName](obj, opts, _state);
+            var new_item = tp[_state.MethodName](node, opts, _state);
             // convert stub into {}
             var dict_obj = {};
             if (Array.isArray(new_item._Items_))
@@ -1092,48 +1094,52 @@ class XmlTemplateFactory
         if (enum_obj!=undefined && enum_obj.obj!=undefined)
         {
             var v = null;
-            if (typeof(enum_obj.obj.getEnumValue)=='function') v = enum_obj.obj.getEnumValue(obj);
-            else v = enum_obj.obj[obj];
+            if (typeof(enum_obj.obj.getEnumValue)=='function') v = enum_obj.obj.getEnumValue(getNodeValue(node));
+            else v = enum_obj.obj[getNodeValue(node)];
             // if it's undefind it will be ignored, do we want an error instead?
-            if (v==null) throw new Error(prop_info.ClassName + ' does not define "' + obj +'"');
+            if (v==null) throw new Error(prop_info.ClassName + ' does not define "' + getNodeValue(node) +'"');
             return v;
         }
         // check simple types
         var func = this.SimpleTypeDecoders[prop_info.ClassName];
-        if (func != undefined) return func(obj);
+        if (func != undefined) return func(getNodeValue(node));
         // check registered class types
-        if (!obj) return null; // if obj is XML empty string?
+        if (!node) return null; // if node is XML empty string?
         var cn = (mods.DerivedClass ? mods.DerivedClass : prop_info.ClassName);
         var tp = this.find(cn);
-        if (tp==null) throw new Error('XmlTemplateFactory cannot find type '+cn);  // return undefined to ignore, null to set obj instance to null, or should we throw error?
-        return tp[_state.MethodName](obj, opts, _state);
+        if (tp==null) throw new Error('XmlTemplateFactory cannot find type '+cn);  // return undefined to ignore, null to set node instance to null, or should we throw error?
+        return tp[_state.MethodName](node, opts, _state);
     }
     /**
      * Encodes an object property value into XML value
      * @private
      * @param {any} obj Property value to encode
      * @param {XmlTemplateItem} prop_info Template describing the property to encode
-     * @param {Object} mods XML Modifiers such as 'type' or 'nil' etc
+     * @param {Object} xml_obj Current XML node
      * @param {Object} opts Options to pass through to next level of XML processing
      * @param {Object} _state state to pass through to next level of XML processing
      * @return {any} Value for use in XML
      */
-    _encodeType(obj, prop_info, mods, opts, _state)
+    _encodeType(obj, prop_info, xml_obj, opts, _state)
     {
-        if (obj==null) return null; // could set mods.IsNull=true, but probably faster/easier to check return or obj directly
+        if (obj==null)
+        {
+            xml_obj.addAttr(_state.XmlInstance+':nil', 'true');
+            return xml_obj;
+        }
         // check for jagged array
         if (prop_info.ArrayData && !prop_info.ArrayData.isOneDim())
         {
             var tp = prop_info.ArrayData.nextTemp(prop_info);
             var stub_obj = {_Items_: obj};
-            return tp[_state.MethodName](stub_obj, opts, _state);
+            return tp[_state.MethodName](stub_obj, xml_obj, opts, _state);
         }
         // check for generic Object used as dictionary
         if (prop_info.DictionaryData)
         {
             // obj is an instance of the KeyValuePairStub
             var tp = prop_info.DictionaryData.createPairTemplate();
-            return tp[_state.MethodName](obj, opts, _state);
+            return tp[_state.MethodName](obj, xml_obj, opts, _state);
         }
         var dict_factory = this.ImplicitDicts[prop_info.ClassName];
         if (dict_factory)
@@ -1145,8 +1151,9 @@ class XmlTemplateFactory
                 var stub = dict_factory.createPairStub(k, obj[k]);
                 arr.push(stub);
             }
+            if (arr.length==0) return xml_obj;
             var tp = dict_factory.createDictTemplate(prop_info.ClassName);
-            return tp[_state.MethodName]({_Items_:arr}, opts, _state);
+            return tp[_state.MethodName]({_Items_:arr}, xml_obj, opts, _state);
         }
         // check for enum
         var enum_obj = this.Enums[prop_info.ClassName];
@@ -1163,18 +1170,18 @@ class XmlTemplateFactory
             }
             // if it cannot find enum name, do we error or just use the raw value?
             if (n==null) throw new Error(prop_info.ClassName + ' does not define "' + obj +'"');
-            return n;
+            return xml_obj.setValue(n);
         }
         // check simple types
         var func = this.SimpleTypeEncoders[prop_info.ClassName];
-        if (func != undefined) return func(obj);
+        if (func != undefined) return xml_obj.setValue(func(obj));
         // check class types
         var otp = this.find(prop_info.ClassName);
         var tp = this._checkForDerived(obj, otp);
         //if (tp==null) return undefined;  // return undefined to throw, or null to include it as null tag?
         if (tp==null) throw new Error('XmlTemplateFactory cannot find type '+cn);
-        mods.DerivedClass = (otp === tp ? null : tp.getName());
-        return tp[_state.MethodName](obj, opts, _state);
+        if (otp !== tp) xml_obj.addAttr(_state.XmlInstance+':type', tp.getName());
+        return tp[_state.MethodName](obj, xml_obj, opts, _state);
     }
     _checkForDerived(obj, tp)
     {
@@ -1243,31 +1250,82 @@ class XmlTemplateFactory
         }
         return this;
     }
-    /**
-     * Creates a new class instance from the given object from xml2js.
-     * @param {Object} xml2js_obj Object produced by xml2js from XML.
-     * @param {Object} [options] Object of options to use for deserialization (specific to this function).
-     * @returns {Object} An instance of the object deserialized from the XML root.
-     */
-    from_xml2js(xml2js_obj, options) // create object instance from xml2js object
+    _from_xmlobj(xml_obj, options, wrapper_constructor)
     {
         // set up any options or initial internal state values
         options = new XmlProcOptions(options);
-        var _state = new XmlProcState(this, '_from_xml2js');
+        var _state = new XmlProcState(this, '_from_xmlobj');
         // get root node
-        var props = Object.getOwnPropertyNames(xml2js_obj);
-        if (!Array.isArray(props)) props = Object.getOwnPropertyNames(props); // if not an array, assume root is first property
-        if (props.length < 1) throw new Error('XmlTemplateFactory.from_xml2js needs at least one root property');
-        var root_name = props[0];
-        var root_node = xml2js_obj[root_name];
+        var root_node = wrapper_constructor.fromTopObject(xml_obj);
         // find xml template with which to parse node
-        var root_temp = this.find(root_name);
+        var root_temp = this.find(root_node.getTagName());
         if (root_temp==null) throw new Error('XmlTemplateFactory does not contain template for "' + root_name +'"');
         // grab any needed namespace info off root element
-        var inst_ns = xml2js_FindNS(root_node, 'http://www.w3.org/2001/XMLSchema-instance');
+        var inst_ns = root_node.findNS('http://www.w3.org/2001/XMLSchema-instance');
         if (inst_ns) _state.XmlInstance = inst_ns;
         _state.RootNameSpace = root_temp.XmlNameSpace;
-        return root_temp._from_xml2js(xml2js_obj[props[0]], options, _state);
+        return root_temp._from_xmlobj(root_node, options, _state);
+    }
+    _to_xmlobj(root_obj, options, wrapper_constructor)
+    {
+        // set up any options or initial internal state values
+        options = new XmlProcOptions(options);
+        var _state = new XmlProcState(this, '_to_xmlobj');
+        // find the root object in the xml factory
+        var class_name;
+        if (module.exports.IsClassInstance(root_obj)) class_name = root_obj.constructor.name;
+        else throw new Error('XmlTemplateFactory.to_xmldom cannot determine class name from instance');
+        // find xml template with which to parse node
+        var temp = this.find(class_name);
+        if (temp==null) throw new Error('XmlTemplateFactory does not contain template for "' + class_name +'"');
+        // make root node
+        _state.XmlInstance = (temp.XmlNameSpace ? 'i' : 'xsi'); // we will add the actual namespace at the end
+        _state.RootNameSpace = temp.XmlNameSpace;
+        var xml_obj = wrapper_constructor.makeTopObject(class_name);
+        if (temp.XmlNameSpace)
+        {
+            xml_obj.addAttr('xmlns:i', 'http://www.w3.org/2001/XMLSchema-instance');
+            xml_obj.addAttr('xmlns', temp.XmlNameSpace);
+        }
+        else
+        {
+            xml_obj.addAttr('xmlns:xsd', 'http://www.w3.org/2001/XMLSchema');
+            xml_obj.addAttr('xmlns:xsi', 'http://www.w3.org/2001/XMLSchema-instance');
+        }
+        temp._to_xmlobj(root_obj, xml_obj, options, _state);
+        return xml_obj.getTopObject();
+    }
+
+    /**
+     * Creates a new class instance from the given object from xmldom XMLDocument.
+     * @param {Object} xmldom_obj Object produced by xmldom from XML.
+     * @param {Object} [options] Object of options to use for deserialization (specific to this function).
+     * @returns {Object} An instance of the object deserialized from the XML root.
+     */
+    from_xmldom(xmldom_obj, options)
+    {
+        return this._from_xmlobj(xmldom_obj, options, Wrapper_xmldom);
+    }
+    /**
+     * Creates a new object for xml2js to use from given instance of a known class.
+     * @param {Object} root_obj Instance of a class known to this factory to be serialized.
+     * @param {Object} [options] Object of options to use for serialization (specific to this function).
+     * @returns {Object} Object that xmldom can use to generate XML.
+     */
+    to_xmldom(root_obj, options)
+    {
+        return this._to_xmlobj(root_obj, options, Wrapper_xmldom);
+    }
+
+    /**
+     * Creates a new class instance from the given object from xml2js.
+     * @param {Object} xml2js_obj Object produced by xmldom from XML.
+     * @param {Object} [options] Object of options to use for deserialization (specific to this function).
+     * @returns {Object} An instance of the object deserialized from the XML root.
+     */
+    from_xml2js(xml2js_obj, options)
+    {
+        return this._from_xmlobj(xml2js_obj, options, Wrapper_xml2js);
     }
     /**
      * Creates a new object for xml2js to use from given instance of a known class.
@@ -1275,33 +1333,13 @@ class XmlTemplateFactory
      * @param {Object} [options] Object of options to use for serialization (specific to this function).
      * @returns {Object} Object that xml2js can use to generate XML.
      */
-    to_xml2js(root_obj, options) // create xml2js object from the given object instance
+    to_xml2js(root_obj, options)
     {
-        // set up any options or initial internal state values
-        options = new XmlProcOptions(options);
-        var _state = new XmlProcState(this, '_to_xml2js');
-        // find the root object in the xml factory
-        var class_name;
-        if (module.exports.IsClassInstance(root_obj)) class_name = root_obj.constructor.name;
-        else throw new Error('XmlTemplateFactory.to_xml2js cannot determine class name from instance');
-        // find xml template with which to parse node
-        var temp = this.find(class_name);
-        if (temp==null) throw new Error('XmlTemplateFactory does not contain template for "' + class_name +'"');
-        // make root node, which for xml2js is an explicit property (using default settings)
-        var xml_obj = {};
-        _state.XmlInstance = (temp.XmlNameSpace ? 'i' : 'xsi'); // we will add the actual namespace at the end
-        _state.RootNameSpace = temp.XmlNameSpace;
-        xml_obj[class_name] = temp._to_xml2js(root_obj, options, _state);
-        if (typeof(xml_obj[class_name])=='object')
-        {
-            // add typical namespaces, taking care not to blow away any attributes already there
-            var name_spaces = temp.XmlNameSpace ? { 'xmlns:i':'http://www.w3.org/2001/XMLSchema-instance', 'xmlns':temp.XmlNameSpace } : { 'xmlns:xsd':'http://www.w3.org/2001/XMLSchema', 'xmlns:xsi':'http://www.w3.org/2001/XMLSchema-instance' };
-            xml_obj[class_name]['$'] = Object.assign(name_spaces, xml_obj[class_name]['$']);
-        }
-        return xml_obj;
+        return this._to_xmlobj(root_obj, options, Wrapper_xml2js);
     }
 } // END CLASS: XmlTemplateFactory
 module.exports.XmlTemplateFactory = XmlTemplateFactory;
+
 
 /**
  * A little wrapper for internal handling of user options
@@ -1372,7 +1410,7 @@ class XmlProcState
     {
         if (this.NS.Prefix!=prevNS.Prefix && this.NS.Prefix && ns)
         {
-            --this.NS.PrefixCount;
+            //--this.NS.PrefixCount; // actually the prev state save will roll this back for us
             return this.NS.Prefix;
         }
         return null;
@@ -1411,40 +1449,228 @@ class XmlNameSpaceState
 }
 
 
-// region "xml2js helpers"
-function xml2js_FindNS(node, ns)
+/**
+ * Base class for XML library wrappers
+ * @private
+ */
+class Wrapper_Base
 {
-    if (node && node.$)
+    constructor()
     {
-        var attrs = Object.getOwnPropertyNames(node.$);
-        for (let i=0; i<attrs.length; ++i)
+        // anything in common besides methods?
+    }
+}
+/**
+ * If node is XML, extract value. If already a value, pass it through
+ * @param {any} node XML node or value
+ */
+function getNodeValue(node)
+{
+    if (node == null) return null;
+    if (node instanceof Wrapper_Base)
+    {
+        return node.getValue();
+    }
+    return node; // assume it is already a value
+}
+
+/**
+ * Wrapper for xmldom
+ * @private
+ */
+class Wrapper_xmldom extends Wrapper_Base
+{
+    constructor(doc, node)
+    {
+        super();
+        this.XmlDoc = doc;
+        this.Node = node;
+    }
+    static fromTopObject(read_obj)
+    {
+        // top object of xmldom is XmlDocument
+        return new Wrapper_xmldom(read_obj, read_obj.documentElement);
+    }
+    static makeTopObject(root_name) // return new root node?
+    {
+        var doc = getDOMImplementation();
+        if (doc==null) throw new Error('Cannot find DOMImplementatio !');
+        try { doc = doc.createDocument(); }
+        catch (e) { throw new Error('Cannot create XMLDocument> ' + e.message); }
+        var root_node = doc.createElement(root_name);
+        doc.appendChild(root_node);
+        var pi = doc.createProcessingInstruction('xml', 'version="1.0" encoding="utf-8"');
+        doc.insertBefore(pi, doc.documentElement);
+        return new Wrapper_xmldom(doc, root_node);
+    }
+    getTopObject() { return this.XmlDoc; }
+    getTagName() { return this.Node.tagName; }
+    makeNode(name, content)
+    {
+        var node = this.XmlDoc.createElement(name);
+        if (content!=undefined) node.textContent = content;
+        return new Wrapper_xmldom(this.XmlDoc, node);
+    }
+    addNode(node)
+    {
+        this.Node.appendChild(node.Node);
+        return this;
+    }
+    addAttr(n, v)
+    {
+        this.Node.setAttribute(n, v);
+    }
+    getAttr(n)
+    {
+        if (this.Node == null || this.Node.getAttribute == null) return null;
+        var v = this.Node.getAttribute(n);
+        return (v ? v : undefined);
+    }
+    findNS(ns)
+    {
+        if (this.Node==null) return null;
+        for (let i=0; i<this.Node.attributes.length; ++i)
         {
-            // xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" -> {'xmlns:xsi':"http://www.w3.org/2001/XMLSchema-instance"}
-            // Should we just do root_node.$[a].includes('XMLSchema-instance') or stay specific ?
-            //if (attrs[i].startsWith('xmlns:') && node.$[attrs[i]].includes(ns))
-            if (attrs[i].startsWith('xmlns:') && node.$[attrs[i]]==ns)
+            var attrib = this.Node.attributes[i];
+            if (attrib.name.startsWith('xmlns:') && attrib.value == ns) return attrib.name.substr(6);
+        }
+        return null;
+    }
+    getFirstNode(n)
+    {
+        if (this.Node!=null)
+        {
+            for (let i=0; i<this.Node.childNodes.length; ++i)
             {
-                return attrs[i].substr(6); // remove 'xmlns:'
+                if (this.Node.childNodes[i].nodeType==1 && this.Node.childNodes[i].tagName == n) return new Wrapper_xmldom(this.XmlDoc, this.Node.childNodes[i]);
             }
         }
+        return undefined;
     }
-    return null;
+    getNodes(n)
+    {
+        var arr = [];
+        for (let i=0; i<this.Node.childNodes.length; ++i)
+        {
+            if (this.Node.childNodes[i].nodeType==1 && this.Node.childNodes[i].tagName == n) arr.push(new Wrapper_xmldom(this.XmlDoc, this.Node.childNodes[i]));
+        }
+        return arr;
+    }
+    setValue(v)
+    {
+        this.Node.textContent = v;
+        return this;
+    }
+    getValue()
+    {
+        return (this.Node.textContent == null ? null : this.Node.textContent);
+    }
 }
-function xml2js_GetAttr(node, n)
+
+/**
+ * Wrapper for xml2js
+ * @private
+ */
+class Wrapper_xml2js extends Wrapper_Base
 {
-    return (node && node.$) ? node.$[n] : undefined;
+    constructor(name, content)
+    {
+        super();
+        this.TagName = name;
+        this.Content = content;
+    }
+    static fromTopObject(read_obj)
+    {
+        // top object has property with name of root node, assume first prop is root
+        var props = Object.getOwnPropertyNames(read_obj);
+        if (!Array.isArray(props)) props = Object.getOwnPropertyNames(props); // if not an array, assume root is first property
+        if (props.length < 1) throw new Error('Wrapper_xml2js.fromTopObject needs at least one root property');
+        var root_name = props[0];
+        return new Wrapper_xml2js(root_name, read_obj[root_name]);
+    }
+    static makeTopObject(root_name) // return new root node?
+    {
+        return new Wrapper_xml2js(root_name, {});
+    }
+    getTopObject() { return { [this.TagName]: this.Content}; }
+    getTagName() { return this.TagName; }
+    makeNode(name, content)
+    {
+        return new Wrapper_xml2js(name, content);
+    }
+    addNode(node)
+    {
+        // xml2js keeps tags of the same name in an array i.e. tagName: [node1, node2,...]
+        if (this.Content==null) this.Content = {};
+        if (!Array.isArray(this.Content[node.TagName])) // subnodes not established
+        {
+            if (node.Content==null) // adding empty node
+            {
+                this.Content[node.TagName] = null; // need this for a proper empty tag
+                return this;
+            }
+            else this.Content[node.TagName] = []; // we are adding non-empty node
+        }
+        this.Content[node.TagName].push(node.Content);
+        return this;
+    }
+    addAttr(n, v)
+    {
+        if (!this.Content) this.Content = {};
+        if (this.Content.$) this.Content.$[n] = v;
+        else this.Content.$ = { [n]:v };
+    }
+    getAttr(n)
+    {
+        return (this.Content && this.Content.$) ? this.Content.$[n] : undefined;
+    }
+    findNS(ns)
+    {
+        if (this.Content && this.Content.$)
+        {
+            var attrs = Object.getOwnPropertyNames(this.Content.$);
+            for (let i=0; i<attrs.length; ++i)
+            {
+                // xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" -> {'xmlns:xsi':"http://www.w3.org/2001/XMLSchema-instance"}
+                // Should we just do root_node.$[a].includes('XMLSchema-instance') or stay specific ?
+                //if (attrs[i].startsWith('xmlns:') && this.Obj.$[attrs[i]].includes(ns))
+                if (attrs[i].startsWith('xmlns:') && this.Content.$[attrs[i]]==ns)
+                {
+                    return attrs[i].substr(6); // remove 'xmlns:'
+                }
+            }
+        }
+        return null;
+    }
+    getFirstNode(n)
+    {
+        if (this.Content==null) return undefined;
+        var xml_node = this.Content[n];
+        if (Array.isArray(xml_node))
+        {
+            if (xml_node.length<1) return;
+            else xml_node = xml_node[0];
+        }
+        if (xml_node==undefined) return null;
+        return new Wrapper_xml2js(n, xml_node);
+    }
+    getNodes(n)
+    {
+        if (this.Content==null) return undefined;
+        var xml_node = this.Content[n];
+        if (xml_node==undefined) return null;
+        if (!Array.isArray(xml_node)) xml_node = [xml_node];
+        return xml_node.map(function(item){return new Wrapper_xml2js(n, item);});
+    }
+    setValue(v)
+    {
+        this.Content = v;
+        return this;
+    }
+    getValue()
+    {
+        return (this.Content == null ? null : this.Content);
+    }
 }
-function xml2js_AddAttr(node, n, v)
-{
-    if (!node) node = {};
-    if (node.$) node.$[n] = v;
-    else node.$ = { [n]:v };
-    return node;
-}
-function xml2js_AddAttrFront(node, n, v)
-{
-    if (!node) node = {};
-    node.$ = Object.assign({ [n]:v }, node.$);
-    return node;
-}
-// endregion "xml2js helpers"
+
+

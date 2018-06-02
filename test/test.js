@@ -2,7 +2,8 @@
 
 const csharp = require('./csharp-test');
 const path = require('path');
-const test_xml = path.join(__dirname,"temp.xml");
+const test_xml_cs = path.join(__dirname,"temp_cs.xml"); // use two files so we can compare if we want
+const test_xml_js = path.join(__dirname,"temp_js.xml");
 
 // "Supported XML librarys"
 const XmlLibs = require('./list_xml_libs');
@@ -40,17 +41,17 @@ function RunTest(test_class,xml_lib,test_number,subtest_number,opts)
 {
     let test_factory = test_class.GetFactory();
     // first have csharp generate xml
-    return csharp.SaveTestXml(test_number,subtest_number,test_xml).then(()=>
+    return csharp.SaveTestXml(test_number,subtest_number,test_xml_cs).then(()=>
     {
         // we read the xml
-        return xml_lib.LoadFromXml(test_factory,test_xml,opts);
+        return xml_lib.LoadFromXml(test_factory,test_xml_cs,opts);
     }).then((obj)=>
     {
         // we write the xml
-        return xml_lib.SaveToXml(obj,test_factory,test_xml,opts);
+        return xml_lib.SaveToXml(obj,test_factory,test_xml_js,opts);
     }).then(()=>
     {
         // csharp verifies the xml
-        return csharp.LoadTestXml(test_number,subtest_number,test_xml);
+        return csharp.LoadTestXml(test_number,subtest_number,test_xml_js);
     });
 }

@@ -36,6 +36,7 @@
   "homepage": "https://github.com/CyDragon80/node-xml-csharp-cereal#readme",
   "devDependencies": {
     "mocha": "^5.1.1",
-    "xml2js": "^0.4.19"
+    "xml2js": "^0.4.19",
+    "xmldom": "^0.1.27"
   }
 }

@@ -107,5 +107,6 @@ test-results/
 *~
 
 # temporary test xml
-/test/temp.xml
+/test/temp_cs.xml
+/test/temp_js.xml
 

@@ -28,6 +28,7 @@ class XmlLibObj
 
 // region Section 1 - XML Library module imports
 const lib_xml2js = require('./test_xml2js');
+const lib_xmldom = require('./test_xmldom');
 // endregion Section 1 - XML Library module imports
 
 
@@ -36,6 +37,7 @@ const lib_xml2js = require('./test_xml2js');
 module.exports =
 [
     new XmlLibObj("xml2js", lib_xml2js),
+    new XmlLibObj("xmldom", lib_xmldom),
 ];
 // endregion Section 2 XML Library object list
 
