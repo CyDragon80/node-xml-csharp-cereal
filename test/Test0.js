@@ -1,5 +1,6 @@
 'use strict'
 const xml = require('../xml-csharp-cereal');
+const Long = require("long"); // to test simple decode/encode overrides
 
 // Just a big mash up of stuff for XmlSerializer
 
@@ -10,11 +11,15 @@ module.exports.GetFactory = function()
         .addEnum('MyEnum', MyEnumExplicit)
         //.addDict('SerializableDictionaryOfStringInt32','KeyValuePair', new xml.XmlTemplateItem('Key','string'),new xml.XmlTemplateItem('Value','int'))
         .addDict('SerializableDictionaryOfStringInt32','KeyValuePair',['Key','string'],['Value','int'])
+        .addDict('SerializableDictionaryTypedOfStringInt32','KeyValuePair',['Key','string'],['Value','int'], null, true)
         // is same as .addDictQuick('SerializableDictionaryOfStringInt32','int')
         .addDictQuick('SerializableDictionaryOfStringSerializableDictionaryOfStringInt32','SerializableDictionaryOfStringInt32')
         .addDictQuick('SerializableDictionaryOfStringSubTestClass','SubTestClass')
         .addDictQuick('SerializableDictionaryOfStringArrayOfMyEnum',['Value','MyEnum',1])
-        .addDictQuick('SerializableDictionaryOfStringArrayOfSerializableDictionaryOfStringInt32',['Value','SerializableDictionaryOfStringInt32', 1]);
+        .addDictQuick('SerializableDictionaryOfStringArrayOfSerializableDictionaryOfStringInt32',['Value','SerializableDictionaryOfStringInt32', 1])
+        // defaults for long are to decode/encode as string, override with Long.js for this test
+        .setSimpleCodec(['long', 'Int64'], decodeLongjs, encodeLongjs)
+        .setSimpleCodec(['ulong', 'UInt64'], decodeULongjs, encodeULongjs);
 }
 
 class TestClass
@@ -46,6 +51,7 @@ class TestClass
         this.MySubClass=new SubTestClass(); //public SubTestClass MySubClass
         this.MySubClassArray=null; //public SubTestClass[] MySubClassArray;
         this.MyIntDict=[]; //public SerializableDictionary<string, int> MyIntDict
+        this.MyIntDictTyped=[]; //public SerializableDictionaryTyped<string, int> MyIntDictTyped
         this.MyIntDictArr=null; //public SerializableDictionary<string, int>[] MyIntDictArr;
         this.MySubClassDict=[]; //public SerializableDictionary<string, SubTestClass> MySubClassDict
         this.MyEnumArrDict = null; //public SerializableDictionary<string, MyEnum[]> MyEnumArrDict;
@@ -77,6 +83,7 @@ class TestClass
         temp.addString('MyStrList', 1);
         temp.add('MySubClass', 'SubTestClass');
         temp.add('MySubClassArray', 'SubTestClass', 1);
+        temp.add('MyIntDictTyped', 'SerializableDictionaryTypedOfStringInt32');
         temp.add('MyIntDict', 'SerializableDictionaryOfStringInt32');
         temp.add('MyIntDictArr', 'SerializableDictionaryOfStringInt32', 1);
         temp.add('MySubClassDict', 'SerializableDictionaryOfStringSubTestClass');
@@ -128,4 +135,34 @@ const MyEnumExplicit =
         if (lut[v]==undefined) return v;  // could return raw value, or return null and encode will throw Error
         return lut[v];
     }
+}
+
+// examples of decode/encode overrides (using Long.js for 64 bit integers)
+function decodeLongjs(val)
+{
+    // parse XML value into Long instance
+    if (val == null) return null; // handle nullable
+    return Long.fromValue(val, false); // let it throw on error
+}
+function encodeLongjs(val)
+{
+    // output Long as string for XML node
+    if (val == null) return null; // handle nullable
+    // if not Long instance already, try to parse into a Long
+    val = Long.fromValue(val, false);
+    return val.toString(); // let it throw on error
+}
+function decodeULongjs(val)
+{
+    // parse XML value into Long instance
+    if (val == null) return null; // handle nullable
+    return Long.fromValue(val, true); // let it throw on error
+}
+function encodeULongjs(val)
+{
+    // output Long as string for XML node
+    if (val == null) return null; // handle nullable
+    // if not Long instance already, try to parse into a Long
+    val = Long.fromValue(val, true);
+    return val.toString(); // let it throw on error
 }

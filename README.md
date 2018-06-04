@@ -107,18 +107,19 @@ var factory = new xml.XmlTemplateFactory();
 factory.add(MyClass1);
 factory.add(GetMyClass2XmlTemplate());
 ```
-Decoder and encoders for some common simple types are stored in XmlTemplateFactory properties 'SimpleTypeDecoders' and 'SimpleTypeEncoders' by default. You can add or override these per instance.
+Decoder and encoders for some common simple types are stored in XmlTemplateFactory by default. You can add or override these per instance.
 ```javascript
 // Defining a simple type called 'hex'
 //  where factory = new XmlTemplateFactory(...)
-factory.SimpleTypeDecoders['hex'] = function(val)
+factory.setSimpleCodec('hex', decodeHex, encodeHex);
+function decodeHex(val)
 {
     // parse hex in XML node to number in object property
     var ret = parseInt(val, 16);
     if (!Number.isFinite(ret)) throw new Error('Decoder for "hex" cannot parse node into finite number');
     return ret;
 }
-factory.SimpleTypeEncoders['hex'] = function(val)
+function encodeHex(val)
 {
     // write hex into XML node from object property value
     val = parseInt(val); // make sure val is actual number
@@ -132,17 +133,13 @@ temp.add('MyHex', 'hex'); // this.MyHex is number stored as hex
 64 bit integers are handled as strings by default. However if you are using a library such as [long.js](https://www.npmjs.com/package/long), you can override the simple type decoder/encoder to utilize a 64 bit number class.
 ```javascript
 const Long = require("long");
-// Overriding default int64 handlers
-//  where factory = new XmlTemplateFactory(...)
-factory.SimpleTypeDecoders['Int64'] =
-factory.SimpleTypeDecoders['long'] = function(val)
+function decodeLongjs(val)
 {
     // parse XML value into Long instance
     if (val == null) return null; // handle nullable
     return Long.fromValue(val, false); // let it throw on error
 }
-factory.SimpleTypeEncoder['Int64'] =
-factory.SimpleTypeEncoders['long'] = function(val)
+function encodeLongjs(val)
 {
     // output Long as string for XML node
     if (val == null) return null; // handle nullable
@@ -150,20 +147,24 @@ factory.SimpleTypeEncoders['long'] = function(val)
     val = Long.fromValue(val, false);
     return val.toString(); // let it throw on error
 }
-// the unsigned is largely the same, just change unsigned param...
-factory.SimpleTypeDecoders['UInt64'] =
-factory.SimpleTypeDecoders['ulong'] = function(val)
+function decodeULongjs(val)
 {
-    if (val == null) return null;
-    return Long.fromValue(val, true);
+    // parse XML value into Long instance
+    if (val == null) return null; // handle nullable
+    return Long.fromValue(val, true); // let it throw on error
 }
-factory.SimpleTypeEncoder['UInt64'] =
-factory.SimpleTypeEncoders['ulong'] = function(val)
+function encodeULongjs(val)
 {
-    if (val == null) return null;
+    // output Long as string for XML node
+    if (val == null) return null; // handle nullable
+    // if not Long instance already, try to parse into a Long
     val = Long.fromValue(val, true);
-    return val.toString();
+    return val.toString(); // let it throw on error
 }
+// Overriding default int64 handlers
+//  where factory = new XmlTemplateFactory(...)
+factory.setSimpleCodec(['long','Int64'], decodeLongjs, encodeLongjs);
+factory.setSimpleCodec(['ulong','UInt64'], decodeULongjs, encodeULongjs);
 ```
 The default DateTime decoder/encoder uses ISO string and javascript Date object. The default for TimeSpan decodes ISO string to seconds using the [moment.js regex method](https://github.com/moment/moment/blob/2e2a5b35439665d4b0200143d808a7c26d6cd30f/src/lib/duration/create.js#L17), as there is no built-in javascript  equivalent. Both DateTime and TimeSpan decode/encode can be overridden to use other methods or libraries, such as [moment.js](https://www.npmjs.com/package/moment) or [TimeSpan.js](https://www.npmjs.com/package/timespan).
 
@@ -323,6 +324,24 @@ Some examples of dictionaries:
 // SerializableDictionary<string, SerializableDictionary<string, int>[]>
 .addDictQuick('SerializableDictionaryOfStringArrayOfSerializableDictionaryOfStringInt32','SerializableDictionaryOfStringInt32', 1)
 
+```
+### XmlTemplateFactory - Dictionaries with Type Tags
+Some implementations of serializable dictionary out there use explicit type tags inside the key and value tags.
+```xml
+  <MyIntDictTyped>
+    <KeyValuePair>
+      <Key>
+        <string>third</string>
+      </Key>
+      <Value>
+        <int>3</int>
+      </Value>
+    </KeyValuePair>
+  </MyIntDictTyped>
+```
+Just set the 'hasExplicitTypeTags' parameter of addDict().
+```javascript
+.addDict('SerializableDictionaryTypedOfStringInt32','KeyValuePair',['Key','string'],['Value','int'], null, true)
 ```
 
 ### XmlTemplate - Constructor Arguments

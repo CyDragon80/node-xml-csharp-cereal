@@ -37,6 +37,7 @@ namespace csharpxml.Test0
 
         public SubTestClass MySubClass = new SubTestClass();
         public SubTestClass[] MySubClassArray;
+        public SerializableDictionaryTyped<string, int> MyIntDictTyped = new SerializableDictionaryTyped<string, int>();
         public SerializableDictionary<string, int> MyIntDict = new SerializableDictionary<string, int>();
         public SerializableDictionary<string, int>[] MyIntDictArr;
         public SerializableDictionary<string, SubTestClass> MySubClassDict = new SerializableDictionary<string, SubTestClass>();
@@ -106,6 +107,8 @@ namespace csharpxml.Test0
                     }
                     MyIntDict.Add("first", 55);
                     MyIntDict.Add("second", 65);
+                    MyIntDictTyped.Add("third", 75);
+                    MyIntDictTyped.Add("fourth", 85);
                     MyIntDictArr = new SerializableDictionary<string, int>[2];
                     for (int i = 0; i < MyIntDictArr.Length; ++i)
                     {

@@ -487,8 +487,9 @@ class XmlTemplateItem
      * @param {?string[]|number} [arr_levels=null] XML tag names for array levels or number of dimensions (if not defined, assumes not an array)
      * @param {?string} [arr_namespace=undefined] XML namespace for array, if any
      * @param {?boolean} [isNullable=null] If simple type should be flagged as nullable
+     * @param {?boolean} [hasExplicitTypeTag=null] If true this prop uses an explicit type tag (somewhat like an array without being one)
      */
-    constructor(prop_name, class_name, arr_levels, arr_namespace, isNullable)
+    constructor(prop_name, class_name, arr_levels, arr_namespace, isNullable, hasExplicitTypeTag)
     {
         if (!module.exports.IsString(prop_name)) throw new Error('XmlTemplateItem.constructor prop_name must be string');
         if (!module.exports.IsString(class_name)) throw new Error('XmlTemplateItem.constructor class_name must be string');
@@ -501,6 +502,7 @@ class XmlTemplateItem
         else this.ArrayData = new ArrayFactory(arr_levels, arr_namespace);
         this.NullableData = (isNullable ? {} : null);
         this.AttrData = null; // Add a member for tracking XML element vs attribute
+        this.ExplicitTypeTag = (hasExplicitTypeTag ? {} : null);
         // temp runtime props
         //this.DictionaryData = null; // can hold a DictionaryFactory in a KeyValuePair during XML processing
     }
@@ -524,6 +526,7 @@ class XmlTemplateItem
         n.NullableData = this.NullableData;
         n.AttrData = this.AttrData;
         n.DictionaryData = this.DictionaryData; // some temporary props carry dict data
+        n.ExplicitTypeTag = this.ExplicitTypeTag;
         return n;
     }
     nullable()
@@ -536,9 +539,15 @@ class XmlTemplateItem
     {
         if (this.ArrayData) throw new Error("Arrays not supported as XML attributes");
         if (this.NullableData) throw new Error("Nullable types not supported as XML attributes")
+        if (this.ExplicitTypeTag) throw new Error("Explicit type tag not supported as XML attributes")
         // mark prop as an attribute? does it need to be a primitive or just call toString/ValueOf? Rely on given type decode/encode functions?
         this.AttrData = {};
         return this;
+    }
+    explicitTypeTag()
+    {
+        if (this.AttrData) throw new Error("Explicit type tag not supported as XML attributes")
+        this.ExplicitTypeTag = {};
     }
 } // END CLASS: XmlTemplateItem
 module.exports.XmlTemplateItem = XmlTemplateItem;
@@ -590,7 +599,7 @@ class XmlTemplate
             {
                 if (Array.isArray(item.BaseClass)) item.BaseClass.push(this.ClassName); // just keep track of last, or track the whole stack up?
                 else item.BaseClass = [this.ClassName];
-            }.bind(this));
+            },this);
         }
         this.ClassConstructor = class_constructor;
         this.ConstructorArgs = constructor_args || null;
@@ -633,13 +642,13 @@ class XmlTemplate
      * @param {?boolean} [isNullable=null] If simple type should be flagged as nullable
      * @returns {XmlTemplateItem} instance of the new property XML template that was added
      */
-    add(prop_name, class_name, arr_levels, arr_namespace, isNullable)
+    add(prop_name, class_name, arr_levels, arr_namespace, isNullable, hasExplicitTypeTag)
     {
         var obj = prop_name; // allow feeding just a XmlTemplateItem instance
         if (!(obj instanceof XmlTemplateItem))
         {
             class_name = CheckConvertClassName(class_name);
-            obj = new XmlTemplateItem(prop_name, class_name, arr_levels, arr_namespace, isNullable);
+            obj = new XmlTemplateItem(prop_name, class_name, arr_levels, arr_namespace, isNullable, hasExplicitTypeTag);
         }
         this.Props.push(obj);
         return obj; // return XmlTemplateItem in case it is useful at some point?
@@ -738,8 +747,6 @@ class XmlTemplate
                     if (prop.ArrayData)   // we expect an array of a single type
                     {
                         prop = prop._checkArray(opts);
-                        // xml2js will turn our type tags into a property containing the sub nodes as another array.
-                        // At this point we have {type:[value,...]}
                         var node_arr = xml_node.getNodes(_state.prefix(prop.ArrayData.getTopTag()));
                         if (node_arr==undefined)
                         {
@@ -759,6 +766,7 @@ class XmlTemplate
                     }
                     else // we expect a single value
                     {
+                        if (prop.ExplicitTypeTag) xml_node = xml_node.getFirstNode(prop.ClassName); // unwrap extra type tag
                         new_item = _state.Factory._decodeType(xml_node, prop, opts, _state);
                         if (new_item!==undefined) new_obj[prop.Name] = new_item; // null is a valid answer
                     }
@@ -810,16 +818,25 @@ class XmlTemplate
                 else if (prop.ArrayData)
                 {
                     prop = prop._checkArray(opts);
+                    var level = _state.prefix(prop.ArrayData.getTopTag());
                     if (!Array.isArray(cur_data)) cur_data = [cur_data];
                     cur_data.forEach(function(item,index)
                     {
                         _state.ObjPath.push(index);
-                        var arr_item = new_item.makeNode(_state.prefix(prop.ArrayData.getTopTag()));
+                        var arr_item = new_item.makeNode(level);
                         arr_item = _state.Factory._encodeType(item, prop, arr_item, opts, _state);
                         if (arr_item===undefined) throw new Error('XmlTemplate._to_xmlobj could not generate "' + prop.ClassName +'"');
                         new_item.addNode(arr_item);
                         _state.ObjPath.pop();
                     },this);
+                    if (xml_obj!==new_item) xml_obj.addNode(new_item);
+                }
+                else if (prop.ExplicitTypeTag) // it's like being in an unlisted array of one
+                {
+                    var arr_item = new_item.makeNode(prop.ClassName);
+                    arr_item = _state.Factory._encodeType(cur_data, prop, arr_item, opts, _state);
+                    if (arr_item===undefined) throw new Error('XmlTemplate._to_xmlobj could not generate "' + prop.ClassName +'"');
+                    new_item.addNode(arr_item);
                     if (xml_obj!==new_item) xml_obj.addNode(new_item);
                 }
                 else    // single node is pretty straight forward for xml2js
@@ -924,6 +941,27 @@ class XmlTemplateFactory
         }; */
     }
     /**
+     * Sets the simple type decoder or encoder for this factory
+     * @param {string|string[]} type_names Simple type name(s) being set
+     * @param {?DecoderCallback} [decode_func=null] Function to decode XML node string into JS property value
+     * @param {?EncoderCallback} [encode_func=null] Function to encode JS property value into XML node string
+     * @param {?string} [type_namespace=null] XML namespace to use for this simple type
+     * @return {XmlTemplateFactory} This factory instance
+     */
+    setSimpleCodec(type_names, decode_func, encode_func, type_namespace)
+    {
+        if (decode_func!=null && typeof(decode_func)!='function') throw new Error('decode_func is not a function');
+        if (encode_func!=null && typeof(encode_func)!='function') throw new Error('encode_func is not a function');
+        if (!Array.isArray(type_names)) type_names = [type_names];
+        type_names.forEach(function(item)
+        {
+            if (decode_func!=null) this.SimpleTypeDecoders[item] = decode_func;
+            if (encode_func!=null) this.SimpleTypeEncoders[item] = encode_func;
+            if (type_namespace!=null) this.SimpleTypeNameSpaces[item] = type_namespace;
+        },this);
+        return this;
+    }
+    /**
      * Add a class XML template to the factory.
      * @param {Function|XmlTemplate} xml_template Class function (with static getXmlTemplate) or XmlTemplate instance.
      * @return {XmlTemplateFactory} This factory instance
@@ -957,14 +995,20 @@ class XmlTemplateFactory
      * @param {XmlTemplateItem|any[]} key_prop Property info for the key (if given array, it is passed to XmlTemplateItem constructor)
      * @param {XmlTemplateItem|any[]} value_prop Property info for the value (if given array, it is passed to XmlTemplateItem constructor)
      * @param {?string} [dict_namespace=null] Class namespace of the dictionary
+     * @param {?boolean} [hasExplicitTypeTags] If true, this dictionary uses type tags within key and value tags
      * @return {XmlTemplateFactory} This factory instance
      */
-    addDict(class_name, pair_name, key_prop, value_prop, dict_namespace)
+    addDict(class_name, pair_name, key_prop, value_prop, dict_namespace, hasExplicitTypeTags)
     {
         if (!module.exports.IsString(class_name)) throw new Error('XmlTemplateFactory.addDict class_name must be string');
         // XmlTemplateItem(prop_name, class_name, arr_levels, arr_namespace)
         if (Array.isArray(key_prop)) key_prop = new XmlTemplateItem(...key_prop);
         if (Array.isArray(value_prop)) value_prop = new XmlTemplateItem(...value_prop);
+        if (hasExplicitTypeTags) // automatically set key and value props to use explicit type tags
+        {
+            key_prop.explicitTypeTag();
+            value_prop.explicitTypeTag();
+        }
         var t = new DictionaryFactory(pair_name, key_prop, value_prop, dict_namespace);
         this.ImplicitDicts[class_name] = t;
         return this;
@@ -974,9 +1018,10 @@ class XmlTemplateFactory
      * @param {string} class_name Name of dictionary class
      * @param {string|XmlTemplateItem|any[]} value_prop Value class name or property info (if given array, it is passed to XmlTemplateItem constructor)
      * @param {?string} [dict_namespace=null] Class namespace of the dictionary
+     * @param {?boolean} [hasExplicitTypeTags] If true, this dictionary uses type tags within key and value tags
      * @return {XmlTemplateFactory} This factory instance
      */
-    addDictQuick(class_name, value_prop, dict_namespace)
+    addDictQuick(class_name, value_prop, dict_namespace, hasExplicitTypeTags)
     {
         if (Array.isArray(value_prop))
         {
@@ -993,7 +1038,7 @@ class XmlTemplateFactory
         }
         else throw new Error('addDictQuick value_prop must be string, XmlTemplateItem, or array of XmlTemplateItem constructor arguments');
         //if (class_name==null) class_name = module.exports.genDictClassName('string', value_class, this.XmlMode);
-        return this.addDict(class_name, 'KeyValuePair', ['Key', 'string'], value_prop, dict_namespace);
+        return this.addDict(class_name, 'KeyValuePair', ['Key', 'string'], value_prop, dict_namespace, hasExplicitTypeTags);
     }
     /**
      * Finds a class XML template from the factory's collection.
