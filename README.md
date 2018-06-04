@@ -1,6 +1,9 @@
 # node-xml-csharp-cereal [![Build Status](https://travis-ci.org/CyDragon80/node-xml-csharp-cereal.svg?branch=master)](https://travis-ci.org/CyDragon80/node-xml-csharp-cereal)
+[![NPM](https://nodei.co/npm/xml-csharp-cereal.png)](https://nodei.co/npm/xml-csharp-cereal/)
 
 This a module to provide XML object serialization in Nodejs. It is meant to be at least somewhat compatible with XML from/to the C# XmlSerializer (and DataContractSerializer with a little work).
+
+This module has no dependencies. Other heavier packages might be created that import this module and other dependencies for those who want more out-of-the-box.
 
 ## Motivation
 
@@ -9,13 +12,14 @@ The original author could not find a simple XML serializer for Nodejs, so this m
 
 ## Installation
 
-This module is contained in a single file, so you can either just grab 'xml-csharp-cereal.js' and add it to your project, or install it from npm.
+This module is contained in a single file, so you can either just grab [xml-csharp-cereal.js](xml-csharp-cereal.js) and add it to your project directly, or install it from npm.
 > npm install xml-csharp-cereal
 
 ## XML Libraries
 
 This module is not written to depend on a singular XML library. Therefore you need to install a supported XML package separately. Each supported XML library would have an associated "to_*XmlLib*()" and "from_*XmlLib*()" on XmlTemplateFactory.
 * [xml2js](https://www.npmjs.com/package/xml2js) { [test/test_xml2js.js](test/test_xml2js.js) } - Supports all current features.
+* [xmldom](https://www.npmjs.com/package/xmldom) { [test/test_xmldom.js](test/test_xmldom.js) } - Supports all current features.
 
 Support for more XML libraries might be added over time.
 
@@ -25,9 +29,10 @@ Support for more XML libraries might be added over time.
 const xml = require('xml-csharp-cereal');
 ```
 ### Deserializing from XML
-Assume we have XML file to deserialize into "my_obj", which if successful should be instanceof MyClass1.
+Assume we have XML file to deserialize into "my_obj", which if successful should be an actual instanceof 'MyClass1'.
 ```javascript
 var XmlFactory = new xml.XmlTemplateFactory(MyClass1, MyClass2);
+
 // Example using xml2js to parse XML file read by fs
 var parser = new xml2js.Parser();
 fs.readFile("/some/path/to/xml", function(err, xml_data)
@@ -48,6 +53,7 @@ fs.readFile("/some/path/to/xml", function(err, xml_data)
 Assume we have "my_obj" which is instanceof MyClass1 and we want to serialize to XML file.
 ```javascript
 var XmlFactory = new xml.XmlTemplateFactory(MyClass1, MyClass2);
+
 // Example using xml2js to build XML file written by fs
 var xml_obj = XmlFactory.to_xml2js(my_obj); // serialize my_obj
 var builder = new xml2js.Builder();
@@ -78,7 +84,7 @@ class MyClass1
         return temp;
     }
 }
-// Or you could use separate template generation
+// Or you could generate the template separately
 class MyClass2
 {
     constructor() { this.OtherString = null }
@@ -101,7 +107,7 @@ var factory = new xml.XmlTemplateFactory();
 factory.add(MyClass1);
 factory.add(GetMyClass2XmlTemplate());
 ```
-Decoder and encoders for some common simple types are stored in XmlTemplateFactory properties SimpleTypeDecoders and SimpleTypeEncoders. You can add or override these per instance.
+Decoder and encoders for some common simple types are stored in XmlTemplateFactory properties 'SimpleTypeDecoders' and 'SimpleTypeEncoders' by default. You can add or override these per instance.
 ```javascript
 // Defining a simple type called 'hex'
 //  where factory = new XmlTemplateFactory(...)
@@ -121,7 +127,7 @@ factory.SimpleTypeEncoders['hex'] = function(val)
 }
 . . .
 // when building XML template...
-temp.add('MyHex', 'hex');
+temp.add('MyHex', 'hex'); // this.MyHex is number stored as hex
 ```
 64 bit integers are handled as strings by default. However if you are using a library such as [long.js](https://www.npmjs.com/package/long), you can override the simple type decoder/encoder to utilize a 64 bit number class.
 ```javascript
@@ -132,43 +138,59 @@ factory.SimpleTypeDecoders['Int64'] =
 factory.SimpleTypeDecoders['long'] = function(val)
 {
     // parse XML value into Long instance
-    if (val == null) return null; // handle nullable long
+    if (val == null) return null; // handle nullable
     return Long.fromValue(val, false); // let it throw on error
 }
 factory.SimpleTypeEncoder['Int64'] =
 factory.SimpleTypeEncoders['long'] = function(val)
 {
     // output Long as string for XML node
-    if (val == null) return null; // handle nullable long
+    if (val == null) return null; // handle nullable
     // if not Long instance already, try to parse into a Long
     val = Long.fromValue(val, false);
     return val.toString(); // let it throw on error
 }
+// the unsigned is largely the same, just change unsigned param...
+factory.SimpleTypeDecoders['UInt64'] =
+factory.SimpleTypeDecoders['ulong'] = function(val)
+{
+    if (val == null) return null;
+    return Long.fromValue(val, true);
+}
+factory.SimpleTypeEncoder['UInt64'] =
+factory.SimpleTypeEncoders['ulong'] = function(val)
+{
+    if (val == null) return null;
+    val = Long.fromValue(val, true);
+    return val.toString();
+}
 ```
-The default DateTime decoder/encoder uses ISO string and javascript Date object. The default TimeSpan uses string, as there is no built-in javascript  equivalent. Both DateTime and TimeSpan decode/encoder can be overriden to use other methods or libraries.
+The default DateTime decoder/encoder uses ISO string and javascript Date object. The default for TimeSpan decodes ISO string to seconds using the [moment.js regex method](https://github.com/moment/moment/blob/2e2a5b35439665d4b0200143d808a7c26d6cd30f/src/lib/duration/create.js#L17), as there is no built-in javascript  equivalent. Both DateTime and TimeSpan decode/encode can be overridden to use other methods or libraries, such as [moment.js](https://www.npmjs.com/package/moment) or [TimeSpan.js](https://www.npmjs.com/package/timespan).
+
 ### XmlTemplate - Add Methods
 The XmlTemplate class provides add functions for the all of the XmlTemplateFactory's built-in types.
 Method|Description
 ------|-----------
-add(*prop_name*, *class_name*, *arr_levels*)|Add instance of class (or simple type) with given array levels
-addString(*prop_name*, *arr_levels*)|Same as add(*prop_name*, 'string', *arr_levels*)
-addByte(*prop_name*, *arr_levels*)|Same as add(*prop_name*, 'byte', *arr_levels*)
-addInt(*prop_name*, *arr_levels*)|Same as add(*prop_name*, 'int', *arr_levels*)
-addFloat(*prop_name*, *arr_levels*)|Same as add(*prop_name*, 'float', *arr_levels*)
-addDouble(*prop_name*, *arr_levels*)|Same as add(*prop_name*, 'double', *arr_levels*)
-addBool(*prop_name*, *arr_levels*)|Same as add(*prop_name*, 'bool', *arr_levels*)
-Also included: addInt16, addUInt16, addInt32, addUInt32, addInt64, addUInt64, addSByte, addUInt, addShort, and addUShort.
+add(*prop_name*, *class_name*, *arr_levels*, *arr_namespace*, *isNullable*)|Add instance of class (or simple type) with given array levels and options.
+addString(*prop_name*, ...)|Same as add(*prop_name*, 'string', ...)
+addByte(*prop_name*, ...)|Same as add(*prop_name*, 'byte', ...)
+addInt(*prop_name*, ...)|Same as add(*prop_name*, 'int', ...)
+addFloat(*prop_name*, ...)|Same as add(*prop_name*, 'float', ...)
+addDouble(*prop_name*, ...)|Same as add(*prop_name*, 'double', ...)
+addBool(*prop_name*, ...)|Same as add(*prop_name*, 'bool', ...)
+Also included: addInt16, addUInt16, addInt32, addUInt32, addInt64, addUInt64, addSByte, addUInt, addShort, addUShort, addDateTime, and addTimeSpan.
 ### XmlTemplate - Add Array
 Just leverage the optional *arr_levels* parameter of add functions. Pass a number of dimensions or an array of level names to use for XML tags.
 ```javascript
 // int[] MyIntArray
 temp.addInt('MyIntArray', 1);
+
 // int[][] MyJagIntArray using implicit level names
 temp.addInt('MyJagIntArray', 2);
 // int[][] MyJagIntArray using explicit level names
 temp.addInt('MyJagIntArray', ['int','ArrayOfInt']);
 ```
-During testing a strange behavior was observed with C# XmlSerializer where defining a int?[] before int[][] would cause the tag names in int[][] to change from "ArrayOfInt" to "ArrayOfInt1". This can be mitigated by either declaring the nullable array last or adding an explicit XmlArrayItem attribute to the subsequent int[][].
+**NOTE:** During testing a strange behavior was observed with C# XmlSerializer where defining a nullable integer array "int?[]" before a jagged integar array "int[][]" would cause the tag names in int[][] to change from "ArrayOfInt" to "ArrayOfInt1". This can be mitigated by either declaring the nullable array last or adding an explicit XmlArrayItem attribute to the subsequent int[][].
 ```csharp
 [XmlArrayItem(ElementName = "ArrayOfInt", IsNullable = false, Type = typeof(int[]))]
 public int[][] MyJagIntArray;
@@ -180,6 +202,10 @@ Just call nullable() on a XmlTemplateItem to make it nullable.
 temp.addInt('MyNullInt').nullable();
 // public int?[] MyNullIntArr;
 temp.addInt('MyNullIntArr', 1).nullable();
+. . .
+// OR use isNullable parameter on add
+temp.addInt('MyNullInt', null, null, true);
+temp.addInt('MyNullIntArr', 1, null, true);
 ```
 ### XmlTemplate - Add as XML Attribute
 Just call attr() on a XmlTemplateItem to us it as XML attribute. Try to keep to simple types as XML attributes.
@@ -214,7 +240,7 @@ factory.SimpleTypeEncoders['MyEnum'] = function(val)
     return lut[val];
 }
 ```
-3. Add object or class that defines getEnumValue(*name*) and getEnumName(*value*) functions to factory.
+3. Add object or class that defines getEnumValue(*name*) and getEnumName(*value*) functions for the factory to use.
 ```javascript
 factory.addEnum('MyEnum', MyEnumExplicit);
 const MyEnumExplicit =
@@ -232,9 +258,41 @@ const MyEnumExplicit =
 }
 ```
 
+### XmlTemplateFactory - Add Object as Explicit Dictionary
+```javascript
+// Brief example of what an explicit dictionary might look like
+class KeyValuePair
+{
+    constructor(k,v)
+    {
+        this.Key=k; this.Value=v;
+    }
+    static getXmlTemplate()
+    {
+        var temp = new xml_sharp.XmlTemplate(this);
+        temp.add('Key', ?); // whatever type Key stores
+        temp.add('Value', ?); // whatever type Value stores
+        return temp;
+    }
+}
+class SomeClass
+{
+    constructor()
+    {
+        this.MyDictionary = []; // array of KeyValuePair
+    }
+    static getXmlTemplate()
+    {
+        var temp = new xml_sharp.XmlTemplate(this);
+        temp.add('MyDictionary', 'KeyValuePair', 1);
+        return temp;
+    }
+}
+```
+
 ### XmlTemplateFactory - Add Object as Implicit Dictionary
 One can certainly construct an explicit dictionary class with explicit templates, but many may opt to use an object whose enumerable property names are used as dictionary keys. (At this time keys should probably be a simple type when using implicit dictionary.)
-Basically you need to register a class with factory that spells out the key-value pair tag name and property info for the key and value.
+Basically you need to register a class with the factory that spells out the key-value pair tag name and property info for the key and value.
 ```javascript
 // longest form
 factory.addDict('SerializableDictionaryOfStringInt32','KeyValuePair', new xml.XmlTemplateItem('Key','string'),new xml.XmlTemplateItem('Value','int'));
@@ -254,7 +312,7 @@ this.MyIntDict = { "dogs":3, "cats":2 };
 // added to template with class name of dictionary
 temp.add('MyIntDict','SerializableDictionaryOfStringInt32');
 ```
-Some more examples of dictionaries:
+Some examples of dictionaries:
 ```javascript
 // SerializableDictionary<string, SerializableDictionary<string, int> >
 .addDictQuick('SerializableDictionaryOfStringSerializableDictionaryOfStringInt32','SerializableDictionaryOfStringInt32')
@@ -278,6 +336,48 @@ var temp = new xml.XmlTemplate(KeyValuePairStub, args);
 var obj = temp.newObj();
 ```
 
+### Derived Classes
+See [test/Test2.js](test/Test2.js) and [test/Test3.js](test/Test3.js) for examples. Basically use XmlTemplate.extend() on a copy of base class's XmlTemplate and add the derived properties to it.
+```javascript
+class SuperHero extends Person
+{
+    constructor()
+    {
+        super();
+        this.SuperName = null;
+    }
+    static getXmlTemplate()
+    {
+        var temp = super.getXmlTemplate();
+        temp.extend(this);
+        temp.addString('SuperName');
+        return temp;
+    }
+}
+```
+
+### DataContract / DataContractSerializer
+Some observations of DataContract XMLs:
+- Most everything except built-in types have namespaces.
+- Some tag names include a hash suffix derived from namespace info.
+- All property tags are in alphabetical order AND derived class props are listed after base props.
+- Arrays and dictionaries are tagged with special namespaces.
+- Array namespace can vary based on content.
+- Jagged array and dictionary type tags follow different naming convention compared to XmlSerializer.
+- Built-in DateTime and TimeSpan support using ISO strings.
+
+See [test/Test1.js](test/Test1.js), [test/Test3.js](test/Test3.js), and [test/Test4.js](test/Test4.js) for examples. There are some helper methods provided.
+```javascript
+// XmlTemplate.setXmlNameSpace() is provided to set a class's XML namespace
+temp.setXmlNameSpace('http://schemas.datacontract.org/2004/07/csharpxml.Test1');
+. . .
+// XmlTemplateFactory.applyDataContractNameSpaces() attempts to assign XML namespaces where they are not already defined by the user. You pass the default namespace.
+factory.applyDataContractNameSpaces("http://schemas.datacontract.org/2004/07/csharpxml.Test1");
+. . .
+// XmlTemplate.add() can take an array XML namespace, if you want to set that manually.
+temp.addInt('MyIntArray', 1, 'http://schemas.microsoft.com/2003/10/Serialization/Arrays');
+```
+
 ## Tests
 
 The tests consist of a node portion (test.js) and a C# portion (csharpxml). csharpxml generates test XMLs for node to read, then node loads/resaves the XML, and csharpxml verifies the result using [Compare-Net-Objects](https://github.com/GregFinzer/Compare-Net-Objects). If running on Linux, you will need to install the [mono-complete package](http://www.mono-project.com/download/stable/#download-lin) to run the tests. A pre-compiled version of the csharpxml app is included with the code in the repo, so re-compilation is not needed unless you need to alter that portion of the tests. (It also saves on Travis test time and complexity.)
@@ -288,4 +388,14 @@ See the readme in the test folder for more info.
 
 ## License
 
-There are too many licenses. The authors and contributors assume no liability or warranty. Use at your own risk. This code is public domain (or "Unlicense" if you prefer). If you are in a country without public domain, apply whatever compatible permissive license is convenient for use in your country.
+The authors and contributors assume no liability or warranty. Use at your own risk. This code is public domain (or "Unlicense" if you prefer). If you are in a country without public domain, apply whatever compatible permissive license is convenient for use in your country.
+
+## Future?
+Things that might be done in future?
+- Make testing more granular?
+- Make testing more thorough?
+- Add tests for error reporting?
+- Improve error reporting?
+- Create another package that includes things like Long.js and TimeSpan.js?
+- In-browser compatibility?
+- Support other non-standard XmlSerializer constructs?
