@@ -29,7 +29,8 @@
                 var parser = new DOMParser();
                 var xml_obj = parser.parseFromString(xml_data, 'application/xml');
                 var obj = factory.from_xmldom(xml_obj);
-                document.getElementById("txTest").innerHTML = JSON.stringify(obj);
+                if (typeof(obj)=='object') document.getElementById("txTest").innerHTML = obj.constructor.name + ": " + JSON.stringify(obj);
+                else document.getElementById("txTest").innerHTML = "ERROR: obj is not an object!";
             }
         </script>
     </body>

@@ -2,7 +2,7 @@
 /**
  * Node.js XML serializer with an eye toward limited C# XmlSerializer compatibility
  * @module xml-csharp-cereal
- * @license Unlicense (DISCLAIMER: Authors and contributors assume no liability or warranty. Use at your own risk.)
+ * @license (Unlicense OR Apache-2.0) DISCLAIMER: Authors and contributors assume no liability or warranty. Use at your own risk.
  */
 
 // self executing anon func can wrap code for CommonJS or classic script, but not for ES6 module as export must be top level

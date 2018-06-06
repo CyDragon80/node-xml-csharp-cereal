@@ -426,7 +426,9 @@ See the [readme](test/README.md) in the test folder for more info.
 
 ## License
 
-The authors and contributors assume no liability or warranty. Use at your own risk. This code is public domain (or "Unlicense" if you prefer). If you are in a country without public domain, apply whatever compatible permissive license is convenient for use in your country.
+The authors and contributors assume no liability or warranty. Use at your own risk. This project can be used under [Unlicense (public domain)](https://spdx.org/licenses/Unlicense.html) or [Apache-2.0](https://spdx.org/licenses/Apache-2.0.html), whichever works for you.
+
+SPDX: (Unlicense OR Apache-2.0)
 
 ## Can I use it in the Browser?
 This is primarily a Nodejs module and that is what npm presently deploys. However the ['browser' folder in the Git repo](https://github.com/CyDragon80/node-xml-csharp-cereal/tree/master/browser) should contain experimental versions generated from the original js via [metascript](https://www.npmjs.com/package/metascript), which you should be able to use with **to_xmldom()** and **from_xmldom()** inside a browser. See the respective test pages in that folder for usage examples as both a classic script and as an ES6 module.
