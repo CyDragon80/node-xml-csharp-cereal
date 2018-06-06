@@ -3,9 +3,10 @@ node_js:
   - "6"
   - "8"
   - "10"
-mono: latest
+before_install:
+  - sudo apt-get update
+  - sudo apt-get install mono-complete
 install:
   - npm install
 script:
   - npm test
-  
