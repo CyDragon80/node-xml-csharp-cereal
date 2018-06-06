@@ -6,8 +6,7 @@
  */
 
 // self executing anon func can wrap code for CommonJS or classic script, but not for ES6 module as export must be top level
-//? if (typeof CLASSIC !== 'undefined')
-//?= '(function() {'
+(function() {
 
 const MyExports = {}; // lets collect all the exports in one object to make it easier to handle different module systems (see bottom for actual export)
 
@@ -1717,13 +1716,6 @@ else this.xml_csharp_cereal = MyExports; */
 
 // Do the actual exporting here (use MetaScript to allow generation of non-CommonJS versions)
 
-//? if (typeof CLASSIC !== 'undefined') {
-//?= 'window.xml_csharp_cereal = MyExports; // browser global'
-//? } else if (typeof ES6_MOD !== 'undefined') {
-//?= 'export default MyExports; // ES6 Module'
-//? } else {
-module.exports = MyExports; // CommonJS
-//? }
+window.xml_csharp_cereal = MyExports; // browser global
 
-//? if (typeof CLASSIC !== 'undefined')
-//?= '}).call(this);'
+}).call(this);

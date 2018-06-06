@@ -4,7 +4,9 @@
   "description": "A module to provide some C# compatible XML serialization in Nodejs",
   "main": "xml-csharp-cereal.js",
   "scripts": {
-    "test": "mocha --reporter spec"
+    "test": "mocha --reporter spec",
+    "browser": "metascript xml-csharp-cereal.js -CLASSIC=true > browser/xml-csharp-cereal-browser.js && metascript xml-csharp-cereal.js -ES6_MOD=true > browser/xml-csharp-cereal-es6mod.js",
+    "build": "npm run browser && npm run test"
   },
   "repository": {
     "type": "git",
@@ -23,9 +25,10 @@
     "xml",
     "cereal",
     "cerealize",
+    "cerealization",
+    "cerealizer",
     "serialize",
     "serialization",
-    "cerealizer",
     "serializer"
   ],
   "author": "CyDragon80",
@@ -36,6 +39,7 @@
   "homepage": "https://github.com/CyDragon80/node-xml-csharp-cereal#readme",
   "devDependencies": {
     "long": "^4.0.0",
+    "metascript": "^1.0.0",
     "mocha": "^5.1.1",
     "xml2js": "^0.4.19",
     "xmldom": "^0.1.27"

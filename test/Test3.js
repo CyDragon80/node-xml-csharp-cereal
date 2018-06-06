@@ -64,6 +64,22 @@ class AlienSuperHero extends SuperHero
         return temp;
     }
 }
+/* function AlienSuperHero() // Should we test the classic class declaration?
+{
+    this.Planet = null; //public string Planet;
+}
+AlienSuperHero.prototype = Object.create(SuperHero.prototype);
+AlienSuperHero.prototype.constructor = AlienSuperHero;
+AlienSuperHero.getXmlTemplate = function()
+{
+    var temp = SuperHero.getXmlTemplate(); // get copy of base class template
+    temp.extend(this); // this template should extend class
+    // add the addition props
+    temp.addString('Planet');
+    temp.setXmlNameSpace('http://schemas.datacontract.org/2004/07/csharpxml.Test3');
+    return temp;
+} */
+
 
 class TestClass
 {

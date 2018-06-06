@@ -3,7 +3,7 @@
 
 This a module to provide XML object serialization in Nodejs. It is meant to be at least somewhat compatible with XML from/to the C# XmlSerializer (and DataContractSerializer with a little work).
 
-This module has no dependencies. Other heavier packages might be created that import this module and other dependencies for those who want more out-of-the-box.
+This module has no dependencies. Other heavier packages might be created that import this module and other dependencies for those who want a particular feature set out-of-the-box.
 
 ## Motivation
 
@@ -31,7 +31,8 @@ const xml = require('xml-csharp-cereal');
 ### Deserializing from XML
 Assume we have XML file to deserialize into "my_obj", which if successful should be an actual instanceof 'MyClass1'.
 ```javascript
-var XmlFactory = new xml.XmlTemplateFactory(MyClass1, MyClass2);
+var factory = new xml.XmlTemplateFactory(MyClass1, MyClass2);
+var xml_options = {}; // see section on options
 
 // Example using xml2js to parse XML file read by fs
 var parser = new xml2js.Parser();
@@ -43,7 +44,7 @@ fs.readFile("/some/path/to/xml", function(err, xml_data)
         else
         {
             // deserialize my_obj from xml lib object
-            var my_obj = XmlFactory.from_xml2js(xml_obj);
+            var my_obj = factory.from_xml2js(xml_obj, xml_options);
             log(util.inspect(my_obj, false, null));
         }
     });
@@ -52,10 +53,11 @@ fs.readFile("/some/path/to/xml", function(err, xml_data)
 ### Serializing to XML
 Assume we have "my_obj" which is instanceof MyClass1 and we want to serialize to XML file.
 ```javascript
-var XmlFactory = new xml.XmlTemplateFactory(MyClass1, MyClass2);
+var factory = new xml.XmlTemplateFactory(MyClass1, MyClass2);
+var xml_options = {}; // see section on options
 
 // Example using xml2js to build XML file written by fs
-var xml_obj = XmlFactory.to_xml2js(my_obj); // serialize my_obj
+var xml_obj = factory.to_xml2js(my_obj, xml_options); // serialize my_obj
 var builder = new xml2js.Builder();
 var xml_data = builder.buildObject(xml_obj);
 fs.writeFile("/some/path/to/xml", xml_data, function(err)
@@ -172,14 +174,13 @@ The default DateTime decoder/encoder uses ISO string and javascript Date object.
 The XmlTemplate class provides add functions for the all of the XmlTemplateFactory's built-in types.
 Method|Description
 ------|-----------
-add(*prop_name*, *class_name*, *arr_levels*, *arr_namespace*, *isNullable*)|Add instance of class (or simple type) with given array levels and options.
+add(*prop_name*, *class_name*, *arr_levels*, *arr_namespace*, *isNullable*, *hasExplicitTypeTag*)|Add instance of class (or simple type) with given array levels and options.
 addString(*prop_name*, ...)|Same as add(*prop_name*, 'string', ...)
-addByte(*prop_name*, ...)|Same as add(*prop_name*, 'byte', ...)
+addBool(*prop_name*, ...)|Same as add(*prop_name*, 'bool', ...)
 addInt(*prop_name*, ...)|Same as add(*prop_name*, 'int', ...)
 addFloat(*prop_name*, ...)|Same as add(*prop_name*, 'float', ...)
 addDouble(*prop_name*, ...)|Same as add(*prop_name*, 'double', ...)
-addBool(*prop_name*, ...)|Same as add(*prop_name*, 'bool', ...)
-Also included: addInt16, addUInt16, addInt32, addUInt32, addInt64, addUInt64, addSByte, addUInt, addShort, addUShort, addDateTime, and addTimeSpan.
+Also included: addInt16, addUInt16, addInt32, addUInt32, addInt64, addUInt64, addSByte, addByte, addUInt, addShort, addUShort, addDateTime, and addTimeSpan.
 ### XmlTemplate - Add Array
 Just leverage the optional *arr_levels* parameter of add functions. Pass a number of dimensions or an array of level names to use for XML tags.
 ```javascript
@@ -296,7 +297,7 @@ One can certainly construct an explicit dictionary class with explicit templates
 Basically you need to register a class with the factory that spells out the key-value pair tag name and property info for the key and value.
 ```javascript
 // longest form
-factory.addDict('SerializableDictionaryOfStringInt32','KeyValuePair', new xml.XmlTemplateItem('Key','string'),new xml.XmlTemplateItem('Value','int'));
+factory.addDict('SerializableDictionaryOfStringInt32','KeyValuePair', new xml.XmlTemplateItem('Key','string'), new xml.XmlTemplateItem('Value','int'));
 
 // long form with array constructor shortcuts
 factory.addDict('SerializableDictionaryOfStringInt32','KeyValuePair',['Key','string'],['Value','int']);
@@ -385,36 +386,57 @@ Some observations of DataContract XMLs:
 - Jagged array and dictionary type tags follow different naming convention compared to XmlSerializer.
 - Built-in DateTime and TimeSpan support using ISO strings.
 
-See [test/Test1.js](test/Test1.js), [test/Test3.js](test/Test3.js), and [test/Test4.js](test/Test4.js) for examples. There are some helper methods provided.
+See [test/Test1.js](test/Test1.js), [test/Test3.js](test/Test3.js), and [test/Test4.js](test/Test4.js) for examples. There are some helper methods provided. You might also want to set XmlMode in the options object, particularly if using automatic names in jagged arrays.
 ```javascript
+// Use XmlMode option to indicate we want DataContract style
+const xml = require('xml-csharp-cereal');
+var xml_options = {XmlMode: xml.xmlModes.DataContractSerializer};
+var my_obj = factory.from_xml2js(xml_obj, xml_options);
+. . .
 // XmlTemplate.setXmlNameSpace() is provided to set a class's XML namespace
 temp.setXmlNameSpace('http://schemas.datacontract.org/2004/07/csharpxml.Test1');
 . . .
-// XmlTemplateFactory.applyDataContractNameSpaces() attempts to assign XML namespaces where they are not already defined by the user. You pass the default namespace.
+// XmlTemplateFactory.applyDataContractNameSpaces() attempts to assign XML namespaces where they are not already defined by the user. You pass the default namespace and it tries to figure things out for you.
 factory.applyDataContractNameSpaces("http://schemas.datacontract.org/2004/07/csharpxml.Test1");
 . . .
 // XmlTemplate.add() can take an array XML namespace, if you want to set that manually.
 temp.addInt('MyIntArray', 1, 'http://schemas.microsoft.com/2003/10/Serialization/Arrays');
+// XmlTemplateFactory addEnum and addDict also have optional namespace parameters for manually assigning XML namespace.
 ```
+
+## Serialization Options
+The to/from methods of factory can take an options object.
+Option|Default|Description
+------|-------|-----------
+XmlMode|xmlModes.XmlSerializer|Value from 'xmlModes' used when difference of behavior is needed, such as XmlSerializer jagged array names vs DataContractSerializer names.
+UseNil|false|If true, instead of omitting null nodes use the nil attribute.
+
+## Package Scripts
+Script|Description
+------|-----------
+npm run test|Run the tests
+npm run browser|Generate browser versions in 'browser' folder
+npm run build|Runs 'browser' then 'test'
 
 ## Tests
 
 The tests consist of a node portion (test.js) and a C# portion (csharpxml). csharpxml generates test XMLs for node to read, then node loads/resaves the XML, and csharpxml verifies the result using [Compare-Net-Objects](https://github.com/GregFinzer/Compare-Net-Objects). If running on Linux, you will need to install the [mono-complete package](http://www.mono-project.com/download/stable/#download-lin) to run the tests. A pre-compiled version of the csharpxml app is included with the code in the repo, so re-compilation is not needed unless you need to alter that portion of the tests. (It also saves on Travis test time and complexity.)
 
-> npm test
-
-See the readme in the test folder for more info.
+See the [readme](test/README.md) in the test folder for more info.
 
 ## License
 
 The authors and contributors assume no liability or warranty. Use at your own risk. This code is public domain (or "Unlicense" if you prefer). If you are in a country without public domain, apply whatever compatible permissive license is convenient for use in your country.
 
+## Can I use it in the Browser?
+This is primarily a Nodejs module and that is what npm presently deploys. However the ['browser' folder in the Git repo](https://github.com/CyDragon80/node-xml-csharp-cereal/tree/master/browser) should contain experimental versions generated from the original js via [metascript](https://www.npmjs.com/package/metascript), which you should be able to use with **to_xmldom()** and **from_xmldom()** inside a browser. See the respective test pages in that folder for usage examples as both a classic script and as an ES6 module.
+
 ## Future?
-Things that might be done in future?
+Things that might could be done in future?
 - Make testing more granular?
 - Make testing more thorough?
 - Add tests for error reporting?
 - Improve error reporting?
-- Create another package that includes things like Long.js and TimeSpan.js?
-- In-browser compatibility?
-- Support other non-standard XmlSerializer constructs?
+- Create another package that includes preconfigured extras like Long.js and TimeSpan.js?
+- Better In-browser compatibility or deployment?
+- Support other odd ball XmlSerializer constructs?

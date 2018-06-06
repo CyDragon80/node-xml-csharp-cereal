@@ -1,0 +1,36 @@
+<html lang=en>
+    <head>
+        <meta charset=utf-8>
+        <title>Test Page for XML CSHARP CEREAL in Browser</title>
+        <script src="./xml-csharp-cereal-browser.js"></script>
+    </head>
+    <body>
+        <p id="txTest">Loading</p>
+        <script>
+            window.onload = function()
+            {
+                var xml_data = "<Person>" +
+                    "<Name>Me</Name>" +
+                    "<Age>99</Age>" +
+                    "</Person>";
+                function Person(name, age)
+                {
+                    this.Name = name || null;
+                    this.Age = age || null;
+                }
+                Person.getXmlTemplate = function()
+                {
+                    var temp = new xml_csharp_cereal.XmlTemplate(this);
+                    temp.addString('Name');
+                    temp.addInt('Age');
+                    return temp;
+                }
+                var factory = new xml_csharp_cereal.XmlTemplateFactory(Person);
+                var parser = new DOMParser();
+                var xml_obj = parser.parseFromString(xml_data, 'application/xml');
+                var obj = factory.from_xmldom(xml_obj);
+                document.getElementById("txTest").innerHTML = JSON.stringify(obj);
+            }
+        </script>
+    </body>
+</html>
