@@ -5,8 +5,10 @@
     </head>
     <body>
         <p id="txTest">Loading</p>
+        <pre lang="xml" id="txXml"></pre>
         <script type="module" >
             import xml_csharp_cereal from './xml-csharp-cereal-es6mod.js';
+            // from xml
             var xml_data = "<Person>" +
                 "<Name>Me</Name>" +
                 "<Age>99</Age>" +
@@ -27,7 +29,15 @@
             var parser = new DOMParser();
             var xml_obj = parser.parseFromString(xml_data, 'application/xml');
             var obj = factory.from_xmldom(xml_obj);
-            if (typeof(obj)=='object') document.getElementById("txTest").innerHTML = obj.constructor.name + ": " + JSON.stringify(obj);
+            if (typeof(obj)=='object')
+            {
+                document.getElementById("txTest").innerHTML = obj.constructor.name + ": " + JSON.stringify(obj);
+                // to xml again
+                var xml_doc = factory.to_xmldom(obj);
+                var builder = new XMLSerializer();
+                var xml_str = builder.serializeToString(xml_doc)
+                document.getElementById("txXml").appendChild(document.createTextNode(xml_str));
+            }
             else document.getElementById("txTest").innerHTML = "ERROR: obj is not an object!";
         </script>
         <script defer nomodule>

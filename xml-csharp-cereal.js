@@ -185,7 +185,7 @@ function TS_ValOrZero(val)
  * This callback takes value from object and encodes it into appropriate value for XML.
  * @callback EncoderCallback
  * @param {any} val the JS property value to encode
- * @return {any} the encoded XML node string
+ * @return {string} the encoded XML node string
  */
 
 MyExports.encodeString = function encodeString(val)
@@ -583,7 +583,7 @@ class XmlTemplate
      * Creates an instance of XmlTemplate.
      * @param {Function} class_constructor Class function (essentially the constructor)
      * @param {?any[]} [constructor_args=null] Arguments to feed constructor when creating a new instance
-     * @param {?string} [class_name] An alternative class name to use in place of the constructor's name
+     * @param {?string} [class_name=null] An alternative class name or alias to use in place of the constructor's name
      */
     constructor(class_constructor, constructor_args, class_name)
     {
@@ -595,7 +595,7 @@ class XmlTemplate
     }
     /**
      * Gets the name of the class being mapped by this XML template.
-     * @param {?boolean} [full=null] If true, include any class name qualifiers
+     * @param {?boolean} [full=false] If true, include any class name qualifiers
      * @return {string} Name of the class that this template maps
      */
     getName(full) { return (full ? this.ClassName : getShortClass(this.ClassName)); }
@@ -608,7 +608,7 @@ class XmlTemplate
      * Converts the current template into a template for the given derived class
      * @param {Function} class_constructor Class function (essentially the constructor)
      * @param {?any[]} [constructor_args=null] Arguments to feed constructor when creating a new instance
-     * @param {?string} [class_name] An alternative class name to use in place of the constructor's name
+     * @param {?string} [class_name=null] An alternative class name to use in place of the constructor's name
      * @return {XmlTemplate} The current modified template (not a copy)
      */
     extend(class_constructor, constructor_args, class_name)
@@ -709,7 +709,7 @@ class XmlTemplate
     }*/
     /**
      * Sorts the properties list by property names
-     * @param {?boolean} [skip_inherited=null] If true, any inherited props are ignored and put at top of the list in the order they are encounted.
+     * @param {?boolean} [skip_inherited=false] If true, any inherited props are ignored and put at top of the list in the order they are encounted.
      * @returns {XmlTemplate} This instance
      */
     sortByName(skip_inherited)
@@ -968,7 +968,7 @@ class XmlTemplateFactory
         }; */
     }
     /**
-     * Sets the simple type decoder or encoder for this factory
+     * Sets the given simple type decoder or encoder for this factory
      * @param {string|string[]} type_names Simple type name(s) being set
      * @param {?DecoderCallback} [decode_func=null] Function to decode XML node string into JS property value
      * @param {?EncoderCallback} [encode_func=null] Function to encode JS property value into XML node string
@@ -1007,7 +1007,7 @@ class XmlTemplateFactory
      * Adds an enum type description
      * @param {string} enum_name Name of the enum
      * @param {Object} enum_obj Simple object representation of the enum, or object providing getEnumValue and getEnumName functions
-     * @param {?string} [enum_namespace=null] Class namespace of the enum
+     * @param {?string} [enum_namespace=null] XML namespace of the enum
      * @return {XmlTemplateFactory} This factory instance
      */
     addEnum(enum_name, enum_obj, enum_namespace)
@@ -1021,8 +1021,8 @@ class XmlTemplateFactory
      * @param {string} pair_name Name of key-value pair
      * @param {XmlTemplateItem|any[]} key_prop Property info for the key (if given array, it is passed to XmlTemplateItem constructor)
      * @param {XmlTemplateItem|any[]} value_prop Property info for the value (if given array, it is passed to XmlTemplateItem constructor)
-     * @param {?string} [dict_namespace=null] Class namespace of the dictionary
-     * @param {?boolean} [hasExplicitTypeTags] If true, this dictionary uses type tags within key and value tags
+     * @param {?string} [dict_namespace=null] XML namespace of the dictionary
+     * @param {?boolean} [hasExplicitTypeTags=false] If true, this dictionary uses type tags within key and value tags
      * @return {XmlTemplateFactory} This factory instance
      */
     addDict(class_name, pair_name, key_prop, value_prop, dict_namespace, hasExplicitTypeTags)
@@ -1045,7 +1045,7 @@ class XmlTemplateFactory
      * @param {string} class_name Name of dictionary class
      * @param {string|XmlTemplateItem|any[]} value_prop Value class name or property info (if given array, it is passed to XmlTemplateItem constructor)
      * @param {?string} [dict_namespace=null] Class namespace of the dictionary
-     * @param {?boolean} [hasExplicitTypeTags] If true, this dictionary uses type tags within key and value tags
+     * @param {?boolean} [hasExplicitTypeTags=false] If true, this dictionary uses type tags within key and value tags
      * @return {XmlTemplateFactory} This factory instance
      */
     addDictQuick(class_name, value_prop, dict_namespace, hasExplicitTypeTags)
@@ -1334,7 +1334,7 @@ class XmlTemplateFactory
     }
 
     /**
-     * Creates a new class instance from the given object from xmldom XMLDocument.
+     * Creates a new class instance of the root object from xmldom XMLDocument.
      * @param {Object} xmldom_obj XmlDocument object produced by xmldom from XML.
      * @param {Object} [options] Object of options to use for deserialization (specific to this function).
      * @returns {Object} An instance of the root object deserialized from the XML root.
@@ -1344,7 +1344,7 @@ class XmlTemplateFactory
         return this._from_xmlobj(xmldom_obj, options, Wrapper_xmldom);
     }
     /**
-     * Creates a new object for xml2js to use from given instance of a known class.
+     * Creates a new xmldom XMLDocument from given instance of a known class.
      * @param {Object} root_obj Instance of a class known to this factory to be serialized.
      * @param {Object} [options] Object of options to use for serialization (specific to this function).
      * @returns {Object} XmlDocument object that xmldom can use to generate XML.
@@ -1355,7 +1355,7 @@ class XmlTemplateFactory
     }
 
     /**
-     * Creates a new class instance from the given object from xml2js.
+     * Creates a new class instance of the root object from the given xml2js object.
      * @param {Object} xml2js_obj Object produced by xmldom from XML.
      * @param {Object} [options] Object of options to use for deserialization (specific to this function).
      * @returns {Object} An instance of the root object deserialized from the XML root.
@@ -1365,7 +1365,7 @@ class XmlTemplateFactory
         return this._from_xmlobj(xml2js_obj, options, Wrapper_xml2js);
     }
     /**
-     * Creates a new object for xml2js to use from given instance of a known class.
+     * Creates a new xml2js object from given instance of a known class.
      * @param {Object} root_obj Instance of a class known to this factory to be serialized.
      * @param {Object} [options] Object of options to use for serialization (specific to this function).
      * @returns {Object} Object that xml2js can use to generate XML.
@@ -1532,7 +1532,7 @@ class Wrapper_xmldom extends Wrapper_Base
     {
         var doc = getDOMImplementation();
         if (doc==null) throw new Error('Cannot find DOMImplementatio !');
-        try { doc = doc.createDocument(); }
+        try { doc = doc.createDocument(null, null); } // browsers want arguments even if they are null
         catch (e) { throw new Error('Cannot create XMLDocument> ' + e.message); }
         var root_node = doc.createElement(root_name);
         doc.appendChild(root_node);

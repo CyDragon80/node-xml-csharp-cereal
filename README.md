@@ -24,6 +24,7 @@ This module is not written to depend on a singular XML library. Therefore you ne
 Support for more XML libraries might be added over time.
 
 ## Code Example
+JSDoc API documentation is available in [API_JSDOC.md](API_JSDOC.md).
 ```javascript
 // Importing the module
 const xml = require('xml-csharp-cereal');
@@ -409,7 +410,8 @@ Script|Description
 ------|-----------
 npm run test|Run the tests
 npm run browser|Generate browser versions in 'browser' folder
-npm run build|Runs 'browser' then 'test'
+npm run doc|Generates API_JSDOC.md
+npm run build|Runs 'browser' then 'test' then 'doc'
 
 ## Tests
 
