@@ -172,6 +172,7 @@ The default DateTime decoder/encoder uses ISO string and javascript Date object.
 
 ### XmlTemplate - Add Methods
 The XmlTemplate class provides add functions for the all of the XmlTemplateFactory's built-in types.
+
 Method|Description
 ------|-----------
 add(*prop_name*, *class_name*, *arr_levels*, *arr_namespace*, *isNullable*, *hasExplicitTypeTag*)|Add instance of class (or simple type) with given array levels and options.
@@ -180,7 +181,9 @@ addBool(*prop_name*, ...)|Same as add(*prop_name*, 'bool', ...)
 addInt(*prop_name*, ...)|Same as add(*prop_name*, 'int', ...)
 addFloat(*prop_name*, ...)|Same as add(*prop_name*, 'float', ...)
 addDouble(*prop_name*, ...)|Same as add(*prop_name*, 'double', ...)
+
 Also included: addInt16, addUInt16, addInt32, addUInt32, addInt64, addUInt64, addSByte, addByte, addUInt, addShort, addUShort, addDateTime, and addTimeSpan.
+
 ### XmlTemplate - Add Array
 Just leverage the optional *arr_levels* parameter of add functions. Pass a number of dimensions or an array of level names to use for XML tags.
 ```javascript
@@ -229,13 +232,14 @@ factory.addEnum('MyEnum', MyEnumSimple);
 ```
 2. Define a simple type decoder and encoder on the factory.
 ```javascript
-factory.SimpleTypeDecoders['MyEnum'] = function(val)
+factory.setSimpleCodec('MyEnum', decodeMyEnum, encodeMyEnum);
+function decodeMyEnum(val)
 {
     var lut = { zero:0, one:1, two:2, three:3 }
     if (lut[val]==undefined) throw new Error('MyEnum does not define ' + val);
     return lut[val];
 }
-factory.SimpleTypeEncoders['MyEnum'] = function(val)
+function encodeMyEnum(val)
 {
     var lut = { 0:'zero', 1:'one', 2:'two', 3:'three' }
     if (lut[val]==undefined) throw new Error('MyEnum does not define ' + val);
@@ -271,7 +275,7 @@ class KeyValuePair
     }
     static getXmlTemplate()
     {
-        var temp = new xml_sharp.XmlTemplate(this);
+        var temp = new xml.XmlTemplate(this);
         temp.add('Key', ?); // whatever type Key stores
         temp.add('Value', ?); // whatever type Value stores
         return temp;
@@ -285,7 +289,7 @@ class SomeClass
     }
     static getXmlTemplate()
     {
-        var temp = new xml_sharp.XmlTemplate(this);
+        var temp = new xml.XmlTemplate(this);
         temp.add('MyDictionary', 'KeyValuePair', 1);
         return temp;
     }
@@ -314,18 +318,7 @@ this.MyIntDict = { "dogs":3, "cats":2 };
 // added to template with class name of dictionary
 temp.add('MyIntDict','SerializableDictionaryOfStringInt32');
 ```
-Some examples of dictionaries:
-```javascript
-// SerializableDictionary<string, SerializableDictionary<string, int> >
-.addDictQuick('SerializableDictionaryOfStringSerializableDictionaryOfStringInt32','SerializableDictionaryOfStringInt32')
-// SerializableDictionary<string, SubTestClass>
-.addDictQuick('SerializableDictionaryOfStringSubTestClass','SubTestClass')
-// SerializableDictionary<string, MyEnum[]>
-.addDictQuick('SerializableDictionaryOfStringArrayOfMyEnum','MyEnum',1)
-// SerializableDictionary<string, SerializableDictionary<string, int>[]>
-.addDictQuick('SerializableDictionaryOfStringArrayOfSerializableDictionaryOfStringInt32','SerializableDictionaryOfStringInt32', 1)
 
-```
 ### XmlTemplateFactory - Dictionaries with Type Tags
 Some implementations of serializable dictionary out there use explicit type tags inside the key and value tags.
 ```xml
