@@ -1,4 +1,5 @@
 # node-xml-csharp-cereal [![Build Status](https://travis-ci.org/CyDragon80/node-xml-csharp-cereal.svg?branch=master)](https://travis-ci.org/CyDragon80/node-xml-csharp-cereal)
+
 [![NPM](https://nodei.co/npm/xml-csharp-cereal.png)](https://nodei.co/npm/xml-csharp-cereal/)
 
 This a module to provide XML object serialization in Nodejs. It is meant to be at least somewhat compatible with XML from/to the C# XmlSerializer (and DataContractSerializer with a little work).
@@ -7,7 +8,7 @@ This module has no dependencies. Other heavier packages might be created that im
 
 ## Motivation
 
-The original author could not find a simple XML serializer for Nodejs, so this meager one was started. Links to alternative or derivative libraries may be added to this readme section over time to help others searching for similar solutions.
+The original author could not find a XML serializer for Nodejs that just took class instances to XML and back, so this meager one was started. Links to alternative or derivative libraries may be added to this readme section over time to help others searching for similar solutions.
 * [xml-csharp-cereal](https://www.npmjs.com/package/xml-csharp-cereal) - This one.
 
 ## Installation
@@ -24,12 +25,15 @@ This module is not written to depend on a singular XML library. Therefore you ne
 Support for more XML libraries might be added over time.
 
 ## Code Example
+
 JSDoc API documentation is available in [API_JSDOC.md](API_JSDOC.md).
 ```javascript
 // Importing the module
 const xml = require('xml-csharp-cereal');
 ```
+
 ### Deserializing from XML
+
 Assume we have XML file to deserialize into "my_obj", which if successful should be an actual instanceof 'MyClass1'.
 ```javascript
 var factory = new xml.XmlTemplateFactory(MyClass1, MyClass2);
@@ -51,7 +55,9 @@ fs.readFile("/some/path/to/xml", function(err, xml_data)
     });
 });
 ```
+
 ### Serializing to XML
+
 Assume we have "my_obj" which is instanceof MyClass1 and we want to serialize to XML file.
 ```javascript
 var factory = new xml.XmlTemplateFactory(MyClass1, MyClass2);
@@ -67,7 +73,9 @@ fs.writeFile("/some/path/to/xml", xml_data, function(err)
     else resolve();
 });
 ```
+
 ### Setting Up Your Classes
+
 In order to serialize or deserialize your classes, this library needs a XmlTemplate for each class describing the properties to include. This can be done by defining a static getXmlTemplate() on the class itself, or via some external means like a separate function.
 ```javascript
 class MyClass1
@@ -99,7 +107,9 @@ function GetMyClass2XmlTemplate()
   return temp;
 }
 ```
+
 ### Setting Up Your XmlTemplateFactory
+
 An XML file may have various classes and types in it. A XmlTemplateFactory stores everything needed to decode or encode them.
 ```javascript
 // Constructor takes multiple XmlTemplate's and/or classes with getXmlTemplate()
@@ -172,6 +182,7 @@ factory.setSimpleCodec(['ulong','UInt64'], decodeULongjs, encodeULongjs);
 The default DateTime decoder/encoder uses ISO string and javascript Date object. The default for TimeSpan decodes ISO string to seconds using the [moment.js regex method](https://github.com/moment/moment/blob/2e2a5b35439665d4b0200143d808a7c26d6cd30f/src/lib/duration/create.js#L17), as there is no built-in javascript  equivalent. Both DateTime and TimeSpan decode/encode can be overridden to use other methods or libraries, such as [moment.js](https://www.npmjs.com/package/moment) or [TimeSpan.js](https://www.npmjs.com/package/timespan).
 
 ### XmlTemplate - Add Methods
+
 The XmlTemplate class provides add functions for the all of the XmlTemplateFactory's built-in types.
 
 Method|Description
@@ -186,6 +197,7 @@ addDouble(*prop_name*, ...)|Same as add(*prop_name*, 'double', ...)
 Also included: addInt16, addUInt16, addInt32, addUInt32, addInt64, addUInt64, addSByte, addByte, addUInt, addShort, addUShort, addDateTime, and addTimeSpan.
 
 ### XmlTemplate - Add Array
+
 Just leverage the optional *arr_levels* parameter of add functions. Pass a number of dimensions or an array of level names to use for XML tags.
 ```javascript
 // int[] MyIntArray
@@ -201,7 +213,9 @@ temp.addInt('MyJagIntArray', ['int','ArrayOfInt']);
 [XmlArrayItem(ElementName = "ArrayOfInt", IsNullable = false, Type = typeof(int[]))]
 public int[][] MyJagIntArray;
 ```
+
 ### XmlTemplate - Add Nullable
+
 Just call nullable() on a XmlTemplateItem to make it nullable.
 ```javascript
 // public int? MyNullInt;
@@ -213,7 +227,9 @@ temp.addInt('MyNullIntArr', 1).nullable();
 temp.addInt('MyNullInt', null, null, true);
 temp.addInt('MyNullIntArr', 1, null, true);
 ```
+
 ### XmlTemplate - Add as XML Attribute
+
 Just call attr() on a XmlTemplateItem to us it as XML attribute. Try to keep to simple types as XML attributes.
 ```csharp
 // C# declaration
@@ -224,7 +240,9 @@ public string SomeAttr;
 // Building XmlTemplate
 temp.addString('SomeAttr').attr();
 ```
+
 ### XmlTemplateFactory - Add Enum
+
 There are three ways to decode/encode an enumeration.
 1. Add a simple object representation of the enum to factory.
 ```javascript
@@ -266,6 +284,7 @@ const MyEnumExplicit =
 ```
 
 ### XmlTemplateFactory - Add Object as Explicit Dictionary
+
 ```javascript
 // Brief example of what an explicit dictionary might look like
 class KeyValuePair
@@ -298,6 +317,7 @@ class SomeClass
 ```
 
 ### XmlTemplateFactory - Add Object as Implicit Dictionary
+
 One can certainly construct an explicit dictionary class with explicit templates, but many may opt to use an object whose enumerable property names are used as dictionary keys. (At this time keys should probably be a simple type when using implicit dictionary.)
 Basically you need to register a class with the factory that spells out the key-value pair tag name and property info for the key and value.
 ```javascript
@@ -321,6 +341,7 @@ temp.add('MyIntDict','SerializableDictionaryOfStringInt32');
 ```
 
 ### XmlTemplateFactory - Dictionaries with Type Tags
+
 Some implementations of serializable dictionary out there use explicit type tags inside the key and value tags.
 ```xml
   <MyIntDictTyped>
@@ -340,6 +361,7 @@ Just set the 'hasExplicitTypeTags' parameter of addDict().
 ```
 
 ### XmlTemplate - Constructor Arguments
+
 By default, a XmlTemplate generates new instances of its assigned class without constructor arguments. However the constructor for XmlTemplate takes an optional second parameter, which is an array of arguments to use when constructing new instances. This is primarily used internally, but if it is useful to you in some way, it is there.
 ```javascript
 // XmlTemplate(parent_class, constructor_args)
@@ -351,6 +373,7 @@ var obj = temp.newObj();
 ```
 
 ### Derived Classes
+
 See [test/Test2.js](test/Test2.js) and [test/Test3.js](test/Test3.js) for examples. Basically use XmlTemplate.extend() on a copy of base class's XmlTemplate and add the derived properties to it.
 ```javascript
 class SuperHero extends Person
@@ -371,6 +394,7 @@ class SuperHero extends Person
 ```
 
 ### DataContract / DataContractSerializer
+
 Some observations of DataContract XMLs:
 - Most everything except built-in types have namespaces.
 - Some tag names include a hash suffix derived from namespace info.
@@ -399,13 +423,16 @@ temp.addInt('MyIntArray', 1, 'http://schemas.microsoft.com/2003/10/Serialization
 ```
 
 ## Serialization Options
+
 The to/from methods of factory can take an options object.
+
 Option|Default|Description
 ------|-------|-----------
 XmlMode|xmlModes.XmlSerializer|Value from 'xmlModes' used when difference of behavior is needed, such as XmlSerializer jagged array names vs DataContractSerializer names.
 UseNil|false|If true, instead of omitting null nodes use the nil attribute.
 
 ## Package Scripts
+
 Script|Description
 ------|-----------
 npm run test|Run the tests
@@ -426,9 +453,11 @@ The authors and contributors assume no liability or warranty. Use at your own ri
 SPDX: (Unlicense OR Apache-2.0)
 
 ## Can I use it in the Browser?
+
 This is primarily a Nodejs module and that is what npm presently deploys. However the ['browser' folder in the Git repo](https://github.com/CyDragon80/node-xml-csharp-cereal/tree/master/browser) should contain experimental versions generated from the original js via [metascript](https://www.npmjs.com/package/metascript), which you should be able to use with **to_xmldom()** and **from_xmldom()** inside a browser. See the respective test pages in that folder for usage examples as both a classic script and as an ES6 module.
 
 ## Future?
+
 Things that might could be done in future?
 - Make testing more granular?
 - Make testing more thorough?
