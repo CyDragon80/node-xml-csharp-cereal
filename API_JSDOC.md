@@ -9,10 +9,11 @@ Node.js XML serializer with an eye toward limited C# XmlSerializer compatibility
     * [~XmlSerializerError](#module_xml-csharp-cereal..XmlSerializerError)
         * [new XmlSerializerError(msg, [opts], [_state])](#new_module_xml-csharp-cereal..XmlSerializerError_new)
     * [~XmlTemplateItem](#module_xml-csharp-cereal..XmlTemplateItem)
-        * [new XmlTemplateItem(prop_name, class_name, [arr_levels], [arr_namespace], [isNullable], [hasExplicitTypeTag])](#new_module_xml-csharp-cereal..XmlTemplateItem_new)
+        * [new XmlTemplateItem(prop_name, class_name, [arr_levels], [arr_namespace], [isNullable], [hasExplicitTypeTag], [isFlatArray])](#new_module_xml-csharp-cereal..XmlTemplateItem_new)
         * [.nullable()](#module_xml-csharp-cereal..XmlTemplateItem+nullable) ⇒ <code>XmlTemplateItem</code>
         * [.attr()](#module_xml-csharp-cereal..XmlTemplateItem+attr) ⇒ <code>XmlTemplateItem</code>
         * [.explicitTypeTag()](#module_xml-csharp-cereal..XmlTemplateItem+explicitTypeTag) ⇒ <code>XmlTemplateItem</code>
+        * [.flatArr()](#module_xml-csharp-cereal..XmlTemplateItem+flatArr) ⇒ <code>XmlTemplateItem</code>
     * [~XmlTemplate](#module_xml-csharp-cereal..XmlTemplate)
         * [new XmlTemplate(class_constructor, [constructor_args], [class_name])](#new_module_xml-csharp-cereal..XmlTemplate_new)
         * [.getName([full])](#module_xml-csharp-cereal..XmlTemplate+getName) ⇒ <code>string</code>
@@ -20,7 +21,7 @@ Node.js XML serializer with an eye toward limited C# XmlSerializer compatibility
         * [.extend(class_constructor, [constructor_args], [class_name])](#module_xml-csharp-cereal..XmlTemplate+extend) ⇒ <code>XmlTemplate</code>
         * [.clone([class_constructor], [constructor_args], [class_name])](#module_xml-csharp-cereal..XmlTemplate+clone) ⇒ <code>XmlTemplate</code>
         * [.newObj(...constructor_args)](#module_xml-csharp-cereal..XmlTemplate+newObj) ⇒ <code>Object</code>
-        * [.add(prop_name, class_name, [arr_levels], [arr_namespace], [isNullable], [hasExplicitTypeTag])](#module_xml-csharp-cereal..XmlTemplate+add) ⇒ <code>XmlTemplateItem</code>
+        * [.add(prop_name, class_name, [arr_levels], [arr_namespace], [isNullable], [hasExplicitTypeTag], [isFlatArray])](#module_xml-csharp-cereal..XmlTemplate+add) ⇒ <code>XmlTemplateItem</code>
         * [.sortByName([skip_inherited])](#module_xml-csharp-cereal..XmlTemplate+sortByName) ⇒ <code>XmlTemplate</code>
         * [.setXmlNameSpace(xml_namespace)](#module_xml-csharp-cereal..XmlTemplate+setXmlNameSpace) ⇒ <code>XmlTemplate</code>
     * [~XmlTemplateFactory](#module_xml-csharp-cereal..XmlTemplateFactory)
@@ -65,14 +66,15 @@ Class representing the XML template for a given property.
 **Kind**: inner class of [<code>xml-csharp-cereal</code>](#module_xml-csharp-cereal)  
 
 * [~XmlTemplateItem](#module_xml-csharp-cereal..XmlTemplateItem)
-    * [new XmlTemplateItem(prop_name, class_name, [arr_levels], [arr_namespace], [isNullable], [hasExplicitTypeTag])](#new_module_xml-csharp-cereal..XmlTemplateItem_new)
+    * [new XmlTemplateItem(prop_name, class_name, [arr_levels], [arr_namespace], [isNullable], [hasExplicitTypeTag], [isFlatArray])](#new_module_xml-csharp-cereal..XmlTemplateItem_new)
     * [.nullable()](#module_xml-csharp-cereal..XmlTemplateItem+nullable) ⇒ <code>XmlTemplateItem</code>
     * [.attr()](#module_xml-csharp-cereal..XmlTemplateItem+attr) ⇒ <code>XmlTemplateItem</code>
     * [.explicitTypeTag()](#module_xml-csharp-cereal..XmlTemplateItem+explicitTypeTag) ⇒ <code>XmlTemplateItem</code>
+    * [.flatArr()](#module_xml-csharp-cereal..XmlTemplateItem+flatArr) ⇒ <code>XmlTemplateItem</code>
 
 <a name="new_module_xml-csharp-cereal..XmlTemplateItem_new"></a>
 
-#### new XmlTemplateItem(prop_name, class_name, [arr_levels], [arr_namespace], [isNullable], [hasExplicitTypeTag])
+#### new XmlTemplateItem(prop_name, class_name, [arr_levels], [arr_namespace], [isNullable], [hasExplicitTypeTag], [isFlatArray])
 Creates an instance of XmlTemplateItem.
 
 
@@ -82,8 +84,9 @@ Creates an instance of XmlTemplateItem.
 | class_name | <code>string</code> |  | Class or Type Name |
 | [arr_levels] | <code>?Array.&lt;string&gt;</code> \| <code>number</code> | <code></code> | XML tag names for array levels or number of dimensions (if not defined, assumes not an array) |
 | [arr_namespace] | <code>string</code> |  | XML namespace for array, if any |
-| [isNullable] | <code>boolean</code> | <code></code> | If simple type should be flagged as nullable |
-| [hasExplicitTypeTag] | <code>boolean</code> | <code></code> | If true this prop uses an explicit type tag (somewhat like an array without being one) |
+| [isNullable] | <code>boolean</code> | <code>false</code> | If simple type should be flagged as nullable |
+| [hasExplicitTypeTag] | <code>boolean</code> | <code>false</code> | If true this prop uses an explicit type tag (somewhat like an array without being one) |
+| [isFlatArray] | <code>booleab</code> | <code>false</code> | If true and this prop is array, treat it as 'flat' or 'headless' |
 
 <a name="module_xml-csharp-cereal..XmlTemplateItem+nullable"></a>
 
@@ -106,6 +109,13 @@ Mark XmlTemplateItem as having an explicit type tag
 
 **Kind**: instance method of [<code>XmlTemplateItem</code>](#module_xml-csharp-cereal..XmlTemplateItem)  
 **Returns**: <code>XmlTemplateItem</code> - This XmlTemplateItem instance  
+<a name="module_xml-csharp-cereal..XmlTemplateItem+flatArr"></a>
+
+#### xmlTemplateItem.flatArr() ⇒ <code>XmlTemplateItem</code>
+Mark XmlTemplateItem as having a flat or headless XML array
+
+**Kind**: instance method of [<code>XmlTemplateItem</code>](#module_xml-csharp-cereal..XmlTemplateItem)  
+**Returns**: <code>XmlTemplateItem</code> - This XmlTemplateItem instance  
 <a name="module_xml-csharp-cereal..XmlTemplate"></a>
 
 ### xml-csharp-cereal~XmlTemplate
@@ -120,7 +130,7 @@ The XmlTemplate class stores info of how a class's properties are to be serializ
     * [.extend(class_constructor, [constructor_args], [class_name])](#module_xml-csharp-cereal..XmlTemplate+extend) ⇒ <code>XmlTemplate</code>
     * [.clone([class_constructor], [constructor_args], [class_name])](#module_xml-csharp-cereal..XmlTemplate+clone) ⇒ <code>XmlTemplate</code>
     * [.newObj(...constructor_args)](#module_xml-csharp-cereal..XmlTemplate+newObj) ⇒ <code>Object</code>
-    * [.add(prop_name, class_name, [arr_levels], [arr_namespace], [isNullable], [hasExplicitTypeTag])](#module_xml-csharp-cereal..XmlTemplate+add) ⇒ <code>XmlTemplateItem</code>
+    * [.add(prop_name, class_name, [arr_levels], [arr_namespace], [isNullable], [hasExplicitTypeTag], [isFlatArray])](#module_xml-csharp-cereal..XmlTemplate+add) ⇒ <code>XmlTemplateItem</code>
     * [.sortByName([skip_inherited])](#module_xml-csharp-cereal..XmlTemplate+sortByName) ⇒ <code>XmlTemplate</code>
     * [.setXmlNameSpace(xml_namespace)](#module_xml-csharp-cereal..XmlTemplate+setXmlNameSpace) ⇒ <code>XmlTemplate</code>
 
@@ -197,7 +207,7 @@ Returns a new instance of the class associated with this template.
 
 <a name="module_xml-csharp-cereal..XmlTemplate+add"></a>
 
-#### xmlTemplate.add(prop_name, class_name, [arr_levels], [arr_namespace], [isNullable], [hasExplicitTypeTag]) ⇒ <code>XmlTemplateItem</code>
+#### xmlTemplate.add(prop_name, class_name, [arr_levels], [arr_namespace], [isNullable], [hasExplicitTypeTag], [isFlatArray]) ⇒ <code>XmlTemplateItem</code>
 Add property to this class XML template.
 
 **Kind**: instance method of [<code>XmlTemplate</code>](#module_xml-csharp-cereal..XmlTemplate)  
@@ -209,8 +219,9 @@ Add property to this class XML template.
 | class_name | <code>string</code> \| <code>function</code> \| <code>Object</code> |  | Class Name or Class instance or Class function of the property. |
 | [arr_levels] | <code>number</code> \| <code>Array.&lt;string&gt;</code> | <code>0</code> | Number of dimensions or array of tag names (if not defined, assumes no array) |
 | [arr_namespace] | <code>string</code> |  | XML namespace for array, if any |
-| [isNullable] | <code>boolean</code> | <code></code> | If simple type should be flagged as nullable |
-| [hasExplicitTypeTag] | <code>boolean</code> | <code></code> | If true this prop uses an explicit type tag (somewhat like an array without being one) |
+| [isNullable] | <code>boolean</code> | <code>false</code> | If simple type should be flagged as nullable |
+| [hasExplicitTypeTag] | <code>boolean</code> | <code>false</code> | If true this prop uses an explicit type tag (somewhat like an array without being one) |
+| [isFlatArray] | <code>booleab</code> | <code>false</code> | If true and this prop is array, treat it as 'flat' or 'headless' |
 
 <a name="module_xml-csharp-cereal..XmlTemplate+sortByName"></a>
 

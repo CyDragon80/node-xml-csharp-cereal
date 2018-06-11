@@ -60,6 +60,8 @@ class TestClass
 
         this.MyTime = null; // DateTime
         this.MySpan = null; // TimeSpan
+
+        this.Hues = null; // [XmlElement(ElementName = "Color")] public string[] Hues;
     }
     static getXmlTemplate()
     {
@@ -93,6 +95,8 @@ class TestClass
         temp.add('MyIntDictArrDict', 'SerializableDictionaryOfStringArrayOfSerializableDictionaryOfStringInt32');
         temp.addDateTime('MyTime');
         temp.addTimeSpan('MySpan');
+        temp.addString('Hues', ['Color']).flatArr(); // headless flat array
+        //temp.addString('Hues', ['Color'], null, null, null, true);
         return temp;
     }
 }

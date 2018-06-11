@@ -49,6 +49,8 @@ namespace csharpxml.Test0
         public SerializableTimeSpan MySpan;
         /*[XmlArrayItem(ElementName = "DateTime", Type = typeof(SerializableDateTime))]
         public SerializableDateTime[] MyTimes;*/
+        [XmlElement(ElementName = "Color")]
+        public string[] Hues;
 
         public override void PopulateTestObject(int subtest)
         {
@@ -127,6 +129,8 @@ namespace csharpxml.Test0
                     // stop, please
                     MyIntDictArrDict = new SerializableDictionary<string, SerializableDictionary<string, int>[]>();
                     MyIntDictArrDict.Add("yes", MyIntDictArr);
+                    // and now for something completely different
+                    Hues = new string[] { "red", "green", "blue" };
                     break;
                 default:
                     break;

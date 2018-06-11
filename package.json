@@ -1,6 +1,6 @@
 {
   "name": "xml-csharp-cereal",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "description": "A module to provide some C# compatible XML serialization in Nodejs",
   "main": "xml-csharp-cereal.js",
   "scripts": {

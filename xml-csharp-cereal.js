@@ -497,10 +497,11 @@ class XmlTemplateItem
      * @param {string} class_name Class or Type Name
      * @param {?string[]|number} [arr_levels=null] XML tag names for array levels or number of dimensions (if not defined, assumes not an array)
      * @param {?string} [arr_namespace=undefined] XML namespace for array, if any
-     * @param {?boolean} [isNullable=null] If simple type should be flagged as nullable
-     * @param {?boolean} [hasExplicitTypeTag=null] If true this prop uses an explicit type tag (somewhat like an array without being one)
+     * @param {?boolean} [isNullable=false] If simple type should be flagged as nullable
+     * @param {?boolean} [hasExplicitTypeTag=false] If true this prop uses an explicit type tag (somewhat like an array without being one)
+     * @param {?booleab} [isFlatArray=false] If true and this prop is array, treat it as 'flat' or 'headless'
      */
-    constructor(prop_name, class_name, arr_levels, arr_namespace, isNullable, hasExplicitTypeTag)
+    constructor(prop_name, class_name, arr_levels, arr_namespace, isNullable, hasExplicitTypeTag, isFlatArray)
     {
         if (!MyExports.IsString(prop_name)) throw new Error('XmlTemplateItem.constructor prop_name must be string');
         if (!MyExports.IsString(class_name)) throw new Error('XmlTemplateItem.constructor class_name must be string');
@@ -514,6 +515,7 @@ class XmlTemplateItem
         this.NullableData = (isNullable ? {} : null);
         this.AttrData = null; // Add a member for tracking XML element vs attribute
         this.ExplicitTypeTag = (hasExplicitTypeTag ? {} : null);
+        this.FlatArray = (isFlatArray ? {} : null);
         // temp runtime props
         //this.DictionaryData = null; // can hold a DictionaryFactory in a KeyValuePair during XML processing
     }
@@ -538,6 +540,7 @@ class XmlTemplateItem
         n.AttrData = this.AttrData;
         n.DictionaryData = this.DictionaryData; // some temporary props carry dict data
         n.ExplicitTypeTag = this.ExplicitTypeTag;
+        n.FlatArray = this.FlatArray;
         return n;
     }
     /**
@@ -571,6 +574,16 @@ class XmlTemplateItem
     {
         if (this.AttrData) throw new Error("Explicit type tag not supported as XML attributes")
         this.ExplicitTypeTag = {};
+        return this;
+    }
+    /**
+     * Mark XmlTemplateItem as having a flat or headless XML array
+     * @returns {XmlTemplateItem} This XmlTemplateItem instance
+     */
+    flatArr()
+    {
+        this.FlatArray = {};
+        return this;
     }
 } // END CLASS: XmlTemplateItem
 MyExports.XmlTemplateItem = XmlTemplateItem;
@@ -665,17 +678,18 @@ class XmlTemplate
      * @param {string|Function|Object} class_name Class Name or Class instance or Class function of the property.
      * @param {?number|string[]} [arr_levels=0] Number of dimensions or array of tag names (if not defined, assumes no array)
      * @param {?string} [arr_namespace=undefined] XML namespace for array, if any
-     * @param {?boolean} [isNullable=null] If simple type should be flagged as nullable
-     * @param {?boolean} [hasExplicitTypeTag=null] If true this prop uses an explicit type tag (somewhat like an array without being one)
+     * @param {?boolean} [isNullable=false] If simple type should be flagged as nullable
+     * @param {?boolean} [hasExplicitTypeTag=false] If true this prop uses an explicit type tag (somewhat like an array without being one)
+     * @param {?booleab} [isFlatArray=false] If true and this prop is array, treat it as 'flat' or 'headless'
      * @returns {XmlTemplateItem} Instance of the new XML template item that was added for this property
      */
-    add(prop_name, class_name, arr_levels, arr_namespace, isNullable, hasExplicitTypeTag)
+    add(prop_name, class_name, arr_levels, arr_namespace, isNullable, hasExplicitTypeTag, isFlatArray)
     {
         var obj = prop_name; // allow feeding just a XmlTemplateItem instance
         if (!(obj instanceof XmlTemplateItem))
         {
             class_name = CheckConvertClassName(class_name);
-            obj = new XmlTemplateItem(prop_name, class_name, arr_levels, arr_namespace, isNullable, hasExplicitTypeTag);
+            obj = new XmlTemplateItem(prop_name, class_name, arr_levels, arr_namespace, isNullable, hasExplicitTypeTag, isFlatArray);
         }
         this.Props.push(obj);
         return obj; // return XmlTemplateItem in case it is useful at some point?
@@ -750,7 +764,7 @@ class XmlTemplate
             {
                 _state.pushPath(this, prop);
                 var xml_node;
-                if (this.XmlPassthrough || prop.AttrData) xml_node = xml_obj;
+                if (this.XmlPassthrough || prop.AttrData || prop.FlatArray) xml_node = xml_obj;
                 else xml_node = xml_obj.getFirstNode(_state.prefix(prop.Name));
                 if (xml_node!=undefined) // XML has this class property
                 {
@@ -827,7 +841,7 @@ class XmlTemplate
         {
             try
             {
-                var new_item = (this.XmlPassthrough ? xml_obj : xml_obj.makeNode(_state.prefix(prop.Name)));
+                var new_item = (this.XmlPassthrough || prop.FlatArray ? xml_obj : xml_obj.makeNode(_state.prefix(prop.Name)));
                 _state.pushPath(this, prop);
                 var prevNS = _state.saveNsState();
                 var ns = _state.applyNS(_state.Factory._findNS(prop), opts);

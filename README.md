@@ -10,6 +10,7 @@ This module has no dependencies. Other heavier packages might be created that im
 
 The original author could not find a XML serializer for Nodejs that just took class instances to XML and back, so this meager one was started. Links to alternative or derivative libraries may be added to this readme section over time to help others searching for similar solutions.
 * [xml-csharp-cereal](https://www.npmjs.com/package/xml-csharp-cereal) - This one.
+* [xml-decorators](https://www.npmjs.com/package/xml-decorators) - Interesting typescript module using decorators rather than templates. Currently only serializes to XML, but that could change.
 
 ## Installation
 
@@ -212,6 +213,34 @@ temp.addInt('MyJagIntArray', ['int','ArrayOfInt']);
 ```csharp
 [XmlArrayItem(ElementName = "ArrayOfInt", IsNullable = false, Type = typeof(int[]))]
 public int[][] MyJagIntArray;
+```
+
+A last minute addition was made to handle flat/headless/rootless XML arrays. By default array element tags are under a single tag, but you can mark the property as having a flat array and the array elements will simply be listed directly in the containing class.
+```csharp
+// C# declaration of flat XML array prop using element tag names 'Color'
+[XmlElement(ElementName = "Color")]
+public string[] Hues;
+```
+```javascript
+// JS adding prop as flat array with one dimension level name of 'Color'
+temp.addString('Hues', ['Color']).flatArr();
+
+// OR the increasing amount of XmlTemplate.add() / XmlTemplateItem constructor args
+temp.addString('Hues', ['Color'], null, null, null, true);
+```
+```xml
+. . .
+<!-- 'Hues' prop is flat (elements at same level as props) -->
+<Color>red</Color>
+<Color>green</Color>
+<Color>blue</Color>
+. . .
+<!-- vs. 'MyEnumArray' prop with default structure -->
+<MyEnumArray>
+    <MyEnum>one</MyEnum>
+    <MyEnum>two</MyEnum>
+</MyEnumArray>
+. . .
 ```
 
 ### XmlTemplate - Add Nullable
