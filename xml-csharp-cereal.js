@@ -1329,7 +1329,7 @@ class XmlTemplateFactory
         var temp = this.find(class_name);
         if (temp==null) throw new Error('XmlTemplateFactory does not contain template for "' + class_name +'"');
         // make root node
-        var xml_obj = wrapper_constructor.makeTopObject(class_name);
+        var xml_obj = wrapper_constructor.makeTopObject(temp.getName());
         _state.RootNameSpace = temp.XmlNameSpace;
         if (temp.XmlNameSpace) // TODO - should check be temp.XmlNameSpace or options.isDC() ?
         {

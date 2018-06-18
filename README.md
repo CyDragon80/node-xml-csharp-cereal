@@ -259,7 +259,7 @@ temp.addInt('MyNullIntArr', 1, null, true);
 
 ### XmlTemplate - Add as XML Attribute
 
-Just call attr() on a XmlTemplateItem to us it as XML attribute. Try to keep to simple types as XML attributes.
+Just call attr() on a XmlTemplateItem to use it as XML attribute. Try to keep to simple types as XML attributes.
 ```csharp
 // C# declaration
 [XmlAttribute]

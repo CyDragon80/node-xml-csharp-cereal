@@ -43,6 +43,7 @@ const Test1 = require('./Test1');
 const Test2 = require('./Test2');
 const Test3 = require('./Test3');
 const Test4 = require('./Test4');
+const Test5 = require('./Test5');
 // endregion Section 1 - Test class module imports
 
 
@@ -67,5 +68,8 @@ module.exports =
     .add("Defaults", 0, {XmlMode:xml.xmlModes.DataContractSerializer})
     .add("Normal Set", 1, {XmlMode:xml.xmlModes.DataContractSerializer})
     .add("Derived Set", 2, {XmlMode:xml.xmlModes.DataContractSerializer}),
+    new TestClassObj("DBus Introspect Example", 5, Test5)
+    .add("Defaults", 0)
+    .add("Set 1", 1),
 ];
 // endregion Section 2 Test class object list

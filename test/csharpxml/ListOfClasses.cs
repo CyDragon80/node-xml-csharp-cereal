@@ -26,6 +26,8 @@ namespace csharpxml
                     return (XmlTestObjectInterface)new Test3.TestClass();
                 case 4:
                     return (XmlTestObjectInterface)new Test4.TestClass();
+                case 5:
+                    return (XmlTestObjectInterface)new Test5.DBusNode();
                 default:
                     return null;
             }
