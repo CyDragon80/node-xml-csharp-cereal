@@ -8,7 +8,7 @@
     "browser:classic": "metascript xml-csharp-cereal.js -CLASSIC=true | uglifyjs --compress --mangle --source-map -o browser/xml-csharp-cereal-browser.js",
     "browser:es6mod": "metascript xml-csharp-cereal.js -ES6_MOD=true | uglifyjs --compress --mangle --source-map -o browser/xml-csharp-cereal-es6mod.js",
     "browser": "npm run browser:classic && npm run browser:es6mod",
-    "doc": "jsdoc2md xml-csharp-cereal.js > API_JSDOC.md",
+    "doc": "jsdoc2md xml-csharp-cereal.js -c jsdoc-config.json > API_JSDOC.md",
     "build": "npm run browser && npm run test && npm run doc"
   },
   "repository": {
