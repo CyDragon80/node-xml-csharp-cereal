@@ -21,7 +21,7 @@ This module is contained in a single file, so you can either just grab [xml-csha
 
 This module is not written to depend on a singular XML library. Therefore you need to install a supported XML package separately. Each supported XML library would have an associated "to_*XmlLib*()" and "from_*XmlLib*()" on XmlTemplateFactory.
 * [xml2js](https://www.npmjs.com/package/xml2js) { [test/test_xml2js.js](test/test_xml2js.js) } - Supports all current features.
-* [xmldom](https://www.npmjs.com/package/xmldom) { [test/test_xmldom.js](test/test_xmldom.js) } - Supports all current features.
+* [xmldom](https://www.npmjs.com/package/xmldom) { [test/test_xmldom.js](test/test_xmldom.js) } - Supports all current features. (To use a xmldom clone/fork, see options to specify an alternate DOMImplementation on which *to_xmldom* can call *createDocument*.)
 
 Support for more XML libraries might be added over time.
 
@@ -121,7 +121,7 @@ var factory = new xml.XmlTemplateFactory();
 factory.add(MyClass1);
 factory.add(GetMyClass2XmlTemplate());
 ```
-Decoder and encoders for some common simple types are stored in XmlTemplateFactory by default. You can add or override these per instance.
+Decoders and encoders for some common simple types are stored in XmlTemplateFactory by default. You can add or override these per instance.
 ```javascript
 // Defining a simple type called 'hex'
 //  where factory = new XmlTemplateFactory(...)
@@ -214,6 +214,8 @@ temp.addInt('MyJagIntArray', ['int','ArrayOfInt']);
 [XmlArrayItem(ElementName = "ArrayOfInt", IsNullable = false, Type = typeof(int[]))]
 public int[][] MyJagIntArray;
 ```
+
+### XmlTemplate - Add Flat Array
 
 A last minute addition was made to handle flat/headless/rootless XML arrays. By default array element tags are under a single tag, but you can mark the property as having a flat array and the array elements will simply be listed directly in the containing class.
 ```csharp
@@ -312,7 +314,7 @@ const MyEnumExplicit =
 }
 ```
 
-### XmlTemplateFactory - Add Object as Explicit Dictionary
+### XmlTemplateFactory - Explicit Dictionary
 
 ```javascript
 // Brief example of what an explicit dictionary might look like
@@ -362,7 +364,7 @@ factory.addDictQuick('SerializableDictionaryOfStringInt32','int');
 Once a dictionary class is registered to the factory, you can use the class name when creating a template.
 ```javascript
 // property using a simple class acting as dictionary
-// C# - SerializableDictionary<string, int> MyIntDict;
+// C# equivalent: SerializableDictionary<string, int> MyIntDict;
 this.MyIntDict = { "dogs":3, "cats":2 };
 . . .
 // added to template with class name of dictionary
@@ -459,6 +461,7 @@ Option|Default|Description
 ------|-------|-----------
 XmlMode|xmlModes.XmlSerializer|Value from 'xmlModes' used when difference of behavior is needed, such as XmlSerializer jagged array names vs DataContractSerializer names.
 UseNil|false|If true, instead of omitting null nodes use the nil attribute.
+DOMImplementation|null|Allows you to override the DOM implementation object that to_xmldom will use to call the createDocument function. If null, it will check for 'document.implementation' then try 'xmldom' module.
 
 ## Package Scripts
 

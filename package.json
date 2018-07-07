@@ -1,10 +1,10 @@
 {
   "name": "xml-csharp-cereal",
-  "version": "1.0.5",
+  "version": "1.0.6",
   "description": "A module to provide some C# compatible XML serialization in Nodejs",
   "main": "xml-csharp-cereal.js",
   "scripts": {
-    "test": "mocha --reporter spec",
+    "test": "mocha --reporter spec --timeout 5000",
     "browser:classic": "metascript xml-csharp-cereal.js -CLASSIC=true | uglifyjs --compress --mangle --source-map -o browser/xml-csharp-cereal-browser.js",
     "browser:es6mod": "metascript xml-csharp-cereal.js -ES6_MOD=true | uglifyjs --compress --mangle --source-map -o browser/xml-csharp-cereal-es6mod.js",
     "browser": "npm run browser:classic && npm run browser:es6mod",
@@ -41,7 +41,7 @@
   "bugs": {
     "url": "https://github.com/CyDragon80/node-xml-csharp-cereal/issues"
   },
-  "homepage": "https://github.com/CyDragon80/node-xml-csharp-cereal#readme",
+  "homepage": "https://github.com/CyDragon80/node-xml-csharp-cereal",
   "devDependencies": {
     "jsdoc-to-markdown": "^4.0.1",
     "long": "^4.0.0",

@@ -36,7 +36,7 @@ class DBusArg
     }
     static getXmlTemplate()
     {
-        var temp = new xml.XmlTemplate(this);
+        var temp = new xml.XmlTemplate(this, null, 'DBUS.arg'); // trying doing this one as a qualified alias?
         temp.addString('name').attr();
         temp.addString('type').attr();
         temp.addString('direction').attr();
@@ -73,7 +73,7 @@ class DBusMethod
     {
         var temp = new xml.XmlTemplate(this);
         temp.addString('name').attr();
-        temp.add('Args', 'DBusArg', ['arg']).flatArr();
+        temp.add('Args', 'DBUS.arg', 1).flatArr();
         return temp;
     }
 }
@@ -89,7 +89,7 @@ class DBusSignal
     {
         var temp = new xml.XmlTemplate(this);
         temp.addString('name').attr();
-        temp.add('Args', 'DBusArg', ['arg']).flatArr();
+        temp.add('Args', 'DBUS.arg', 1).flatArr();
         return temp;
     }
 }

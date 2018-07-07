@@ -8,6 +8,11 @@ const xml = require('../xml-csharp-cereal');
 
 module.exports.SaveToXml = function(obj, XmlFactory, fname, opts)
 {
+    // test dom implementation override for xmldom forks/clones ?
+    //opts = Object.assign({}, opts, { DOMImplementation:new xmldom.DOMImplementation() });
+    /* var MyDom = { createDocument: function() { return (new xmldom.DOMImplementation()).createDocument(); } }
+    opts = Object.assign({}, opts, { DOMImplementation: MyDom }); */
+
     return new Promise((resolve,reject)=>
     {
         var xml_obj = XmlFactory.to_xmldom(obj, opts);

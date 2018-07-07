@@ -1324,12 +1324,12 @@ class XmlTemplateFactory
         // find the root object in the xml factory
         var class_name;
         if (MyExports.IsClassInstance(root_obj)) class_name = root_obj.constructor.name;
-        else throw new Error('XmlTemplateFactory.to_xmldom cannot determine class name from instance');
+        else throw new Error('XmlTemplateFactory cannot determine class name from instance');
         // find xml template with which to parse node
         var temp = this.find(class_name);
         if (temp==null) throw new Error('XmlTemplateFactory does not contain template for "' + class_name +'"');
         // make root node
-        var xml_obj = wrapper_constructor.makeTopObject(temp.getName());
+        var xml_obj = wrapper_constructor.makeTopObject(temp.getName(), options);
         _state.RootNameSpace = temp.XmlNameSpace;
         if (temp.XmlNameSpace) // TODO - should check be temp.XmlNameSpace or options.isDC() ?
         {
@@ -1542,9 +1542,9 @@ class Wrapper_xmldom extends Wrapper_Base
         // top object of xmldom is XmlDocument
         return new Wrapper_xmldom(read_obj, read_obj.documentElement);
     }
-    static makeTopObject(root_name) // return new root node?
+    static makeTopObject(root_name, opts) // return new root node?
     {
-        var doc = getDOMImplementation();
+        var doc = opts.DOMImplementation || getDOMImplementation();
         if (doc==null) throw new Error('Cannot find DOMImplementatio !');
         try { doc = doc.createDocument(null, null); } // browsers want arguments even if they are null
         catch (e) { throw new Error('Cannot create XMLDocument> ' + e.message); }
@@ -1639,7 +1639,7 @@ class Wrapper_xml2js extends Wrapper_Base
         var root_name = props[0];
         return new Wrapper_xml2js(root_name, read_obj[root_name]);
     }
-    static makeTopObject(root_name) // return new root node?
+    static makeTopObject(root_name, opts) // return new root node?
     {
         return new Wrapper_xml2js(root_name, {});
     }
