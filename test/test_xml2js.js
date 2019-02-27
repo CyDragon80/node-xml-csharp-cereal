@@ -26,9 +26,9 @@ module.exports.LoadFromXml = function(XmlFactory, fname, opts)
 {
     return new Promise((resolve,reject)=>
     {
-        var parser = new xml2js.Parser();
         fs.readFile(fname, function(err, xml_data)
         {
+            var parser = new xml2js.Parser();
             if (err) reject(err);
             else parser.parseString(xml_data, function (err, xml_obj)
             {

@@ -4,11 +4,11 @@
 
 This a module to provide XML object serialization in Nodejs. It is meant to be at least somewhat compatible with XML from/to the C# XmlSerializer (and DataContractSerializer with a little work).
 
-This module has no dependencies. Other heavier packages might be created that import this module and other dependencies for those who want a particular feature set out-of-the-box.
+This module has no dependencies (except for one of the supported XML libraries). Other heavier packages might be created that import this module and other dependencies for those who want a particular feature set out-of-the-box.
 
 ## Motivation
 
-The original author could not find a XML serializer for Nodejs that just took class instances to XML and back, so this meager one was started. Links to alternative or derivative libraries may be added to this readme section over time to help others searching for similar solutions.
+The original author could not find an XML serializer for Nodejs that just took class instances to XML and back, so this meager one was started. Links to alternative or derivative libraries may be added to this readme section over time to help others searching for similar solutions.
 * [xml-csharp-cereal](https://www.npmjs.com/package/xml-csharp-cereal) - This one.
 * [xml-decorators](https://www.npmjs.com/package/xml-decorators) - Interesting typescript module using decorators rather than templates. Currently only serializes to XML, but that could change.
 
@@ -21,7 +21,7 @@ This module is contained in a single file, so you can either just grab [xml-csha
 
 This module is not written to depend on a singular XML library. Therefore you need to install a supported XML package separately. Each supported XML library would have an associated "to_*XmlLib*()" and "from_*XmlLib*()" on XmlTemplateFactory.
 * [xml2js](https://www.npmjs.com/package/xml2js) { [test/test_xml2js.js](test/test_xml2js.js) } - Supports all current features.
-* [xmldom](https://www.npmjs.com/package/xmldom) { [test/test_xmldom.js](test/test_xmldom.js) } - Supports all current features. (To use a xmldom clone/fork, see options to specify an alternate DOMImplementation on which *to_xmldom* can call *createDocument*.)
+* [xmldom](https://www.npmjs.com/package/xmldom) { [test/test_xmldom.js](test/test_xmldom.js) } - Supports all current features. (To use an xmldom clone/fork, see options to specify an alternate DOMImplementation on which *to_xmldom* can call *createDocument*.)
 
 Support for more XML libraries might be added over time.
 
@@ -35,15 +35,15 @@ const xml = require('xml-csharp-cereal');
 
 ### Deserializing from XML
 
-Assume we have XML file to deserialize into "my_obj", which if successful should be an actual instanceof 'MyClass1'.
+Assume we have an XML file to deserialize into "my_obj", which if successful should be an actual instanceof 'MyClass1'.
 ```javascript
 var factory = new xml.XmlTemplateFactory(MyClass1, MyClass2);
 var xml_options = {}; // see section on options
 
 // Example using xml2js to parse XML file read by fs
-var parser = new xml2js.Parser();
 fs.readFile("/some/path/to/xml", function(err, xml_data)
 {
+    var parser = new xml2js.Parser();
     parser.parseString(xml_data, function (err, xml_obj)
     {
         if (err) log(err);
@@ -59,7 +59,7 @@ fs.readFile("/some/path/to/xml", function(err, xml_data)
 
 ### Serializing to XML
 
-Assume we have "my_obj" which is instanceof MyClass1 and we want to serialize to XML file.
+Assume we have "my_obj" which is instanceof MyClass1 and we want to serialize to an XML file.
 ```javascript
 var factory = new xml.XmlTemplateFactory(MyClass1, MyClass2);
 var xml_options = {}; // see section on options
@@ -77,7 +77,7 @@ fs.writeFile("/some/path/to/xml", xml_data, function(err)
 
 ### Setting Up Your Classes
 
-In order to serialize or deserialize your classes, this library needs a XmlTemplate for each class describing the properties to include. This can be done by defining a static getXmlTemplate() on the class itself, or via some external means like a separate function.
+In order to serialize or deserialize your classes, this library needs an XmlTemplate for each class describing the properties to include. This can be done by defining a static getXmlTemplate() on the class itself, or via some external means like a separate function.
 ```javascript
 class MyClass1
 {
@@ -111,7 +111,7 @@ function GetMyClass2XmlTemplate()
 
 ### Setting Up Your XmlTemplateFactory
 
-An XML file may have various classes and types in it. A XmlTemplateFactory stores everything needed to decode or encode them.
+An XML file may have various classes and types in it. An XmlTemplateFactory stores everything needed to decode or encode them.
 ```javascript
 // Constructor takes multiple XmlTemplate's and/or classes with getXmlTemplate()
 var factory = new xml.XmlTemplateFactory(MyClass1, GetMyClass2XmlTemplate());
@@ -188,7 +188,7 @@ The XmlTemplate class provides add functions for the all of the XmlTemplateFacto
 
 Method|Description
 ------|-----------
-add(*prop_name*, *class_name*, *arr_levels*, *arr_namespace*, *isNullable*, *hasExplicitTypeTag*)|Add instance of class (or simple type) with given array levels and options.
+add(*prop_name*, *class_name*, *arr_levels*, *arr_namespace*, *isNullable*, *hasExplicitTypeTag*, *isFlatArray*)|Add instance of class (or simple type) with given array levels and options.
 addString(*prop_name*, ...)|Same as add(*prop_name*, 'string', ...)
 addBool(*prop_name*, ...)|Same as add(*prop_name*, 'bool', ...)
 addInt(*prop_name*, ...)|Same as add(*prop_name*, 'int', ...)
@@ -247,7 +247,7 @@ temp.addString('Hues', ['Color'], null, null, null, true);
 
 ### XmlTemplate - Add Nullable
 
-Just call nullable() on a XmlTemplateItem to make it nullable.
+Just call nullable() on an XmlTemplateItem to make it nullable.
 ```javascript
 // public int? MyNullInt;
 temp.addInt('MyNullInt').nullable();
@@ -261,20 +261,20 @@ temp.addInt('MyNullIntArr', 1, null, true);
 
 ### XmlTemplate - Add as XML Attribute
 
-Just call attr() on a XmlTemplateItem to use it as XML attribute. Try to keep to simple types as XML attributes.
+Just call attr() on an XmlTemplateItem to use it as XML attribute. Try to keep to simple types as XML attributes.
 ```csharp
 // C# declaration
 [XmlAttribute]
 public string SomeAttr;
 ```
 ```javascript
-// Building XmlTemplate
+// Building XmlTemplate in JS
 temp.addString('SomeAttr').attr();
 ```
 
 ### XmlTemplateFactory - Add Enum
 
-There are three ways to decode/encode an enumeration.
+There are three ways to decode/encode an enumeration type/class.
 1. Add a simple object representation of the enum to factory.
 ```javascript
 var MyEnumSimple = { zero:0, one:1, two:2, three:3 };
@@ -393,7 +393,7 @@ Just set the 'hasExplicitTypeTags' parameter of addDict().
 
 ### XmlTemplate - Constructor Arguments
 
-By default, a XmlTemplate generates new instances of its assigned class without constructor arguments. However the constructor for XmlTemplate takes an optional second parameter, which is an array of arguments to use when constructing new instances. This is primarily used internally, but if it is useful to you in some way, it is there.
+By default, an XmlTemplate generates new instances of its assigned class without constructor arguments. However the constructor for XmlTemplate takes an optional second parameter, which is an array of arguments to use when constructing new instances. This is primarily used internally, but if it is useful to you in some way, it is there.
 ```javascript
 // XmlTemplate(parent_class, constructor_args)
 var args = [KeyName, key, ValueName, value];

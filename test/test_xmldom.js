@@ -30,7 +30,6 @@ module.exports.LoadFromXml = function(XmlFactory, fname, opts)
 {
     return new Promise((resolve,reject)=>
     {
-        var parser = new xmldom.DOMParser();
         fs.readFile(fname, 'utf8', function(err, xml_data)
         {
             if (err) reject(err);
@@ -38,6 +37,7 @@ module.exports.LoadFromXml = function(XmlFactory, fname, opts)
             {
                 try
                 {
+                    var parser = new xmldom.DOMParser();
                     var xml_obj = parser.parseFromString(xml_data, 'application/xml');
                     // note traditional XML DOMParser returns <parsererror > XML doc on error
                     var obj = XmlFactory.from_xmldom(xml_obj, opts);
